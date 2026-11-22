@@ -22,12 +22,13 @@ class MohtarifAI extends StatelessWidget {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
-        fontFamily: 'Roboto',
       ),
       home: const HomeScreen(),
     );
   }
 }
+
+// الشاشة الرئيسية
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -80,6 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+// الصفحة الرئيسية
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -218,9 +221,7 @@ class HomePage extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: const Color(0xFF1B1E2E),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white10,
-                        ),
+                        border: Border.all(color: Colors.white10),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,16 +272,31 @@ class HomePage extends StatelessWidget {
   }
 
   void openTool(BuildContext context, String type) {
-    if (type == 'image' || type == 'enhance') {
+    if (type == 'faceswap') {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ImageStudio(enhance: type == 'enhance'),
+          builder: (_) => const FaceSwapStudio(),
+        ),
+      );
+    } else if (type == 'enhance') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const ImageStudio(enhance: true),
+        ),
+      );
+    } else if (type == 'video') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const ComingSoonPage(
+            title: 'استوديو الفيديو',
+          ),
         ),
       );
     } else {
       final names = {
-        'video': 'استوديو الفيديو',
         'voice': 'استنساخ الأصوات',
         'changevoice': 'تغيير الأصوات',
         'music': 'صناعة الأغاني',
@@ -289,12 +305,185 @@ class HomePage extends StatelessWidget {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ComingSoonPage(title: names[type]!),
+          builder: (_) => ComingSoonPage(
+            title: names[type]!,
+          ),
         ),
       );
     }
   }
 }
+
+// استوديو تبديل الوجوه
+
+class FaceSwapStudio extends StatefulWidget {
+  const FaceSwapStudio({super.key});
+
+  @override
+  State<FaceSwapStudio> createState() => _FaceSwapStudioState();
+}
+
+class _FaceSwapStudioState extends State<FaceSwapStudio> {
+  final ImagePicker picker = ImagePicker();
+
+  File? sourceFace;
+  File? targetImage;
+
+  Future<void> selectImage(bool isFace) async {
+    try {
+      final XFile? file = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 100,
+      );
+
+      if (file == null) return;
+
+      setState(() {
+        if (isFace) {
+          sourceFace = File(file.path);
+        } else {
+          targetImage = File(file.path);
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر اختيار الصورة'),
+        ),
+      );
+    }
+  }
+
+  Widget imageBox({
+    required String title,
+    required File? image,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 230,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1B1E2E),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: image == null
+                    ? const Center(
+                        child: Icon(
+                          Icons.add_photo_alternate,
+                          size: 55,
+                          color: Color(0xFF9B7BFA),
+                        ),
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.file(
+                          image,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('استوديو تبديل الوجوه'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            const Text(
+              'اختر الوجه والصورة المستهدفة',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'حدد الصورتين لتجهيز عملية التبديل',
+              style: TextStyle(color: Colors.white60),
+            ),
+            const SizedBox(height: 25),
+            Row(
+              children: [
+                imageBox(
+                  title: 'الوجه الأصلي',
+                  image: sourceFace,
+                  onTap: () => selectImage(true),
+                ),
+                const SizedBox(width: 12),
+                imageBox(
+                  title: 'الصورة المستهدفة',
+                  image: targetImage,
+                  onTap: () => selectImage(false),
+                ),
+              ],
+            ),
+            const SizedBox(height: 25),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed:
+                    sourceFace != null && targetImage != null
+                        ? () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'تم تجهيز الصورتين. محرك تبديل الوجوه سيتم ربطه في المرحلة التالية.',
+                                ),
+                              ),
+                            );
+                          }
+                        : null,
+                icon: const Icon(Icons.auto_awesome),
+                label: const Text('تجهيز تبديل الوجه'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7048C8),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.all(18),
+                ),
+              ),
+            ),
+            const SizedBox(height: 15),
+            const Text(
+              'يمكنك تغيير أي صورة وإعادة اختيارها في أي وقت.',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// استوديو الصور وتحسينها
 
 class ImageStudio extends StatefulWidget {
   final bool enhance;
@@ -323,6 +512,7 @@ class _ImageStudioState extends State<ImageStudio> {
       }
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تعذر فتح الصورة'),
@@ -425,6 +615,8 @@ class _ImageStudioState extends State<ImageStudio> {
   }
 }
 
+// الأدوات التي سيتم تطويرها
+
 class ComingSoonPage extends StatelessWidget {
   final String title;
 
@@ -463,6 +655,8 @@ class ComingSoonPage extends StatelessWidget {
   }
 }
 
+// صفحة أعمالي
+
 class MyWorksPage extends StatelessWidget {
   const MyWorksPage({super.key});
 
@@ -472,11 +666,18 @@ class MyWorksPage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.folder_open, size: 65, color: Colors.white54),
+          Icon(
+            Icons.folder_open,
+            size: 65,
+            color: Colors.white54,
+          ),
           SizedBox(height: 15),
           Text(
             'أعمالي',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           SizedBox(height: 8),
           Text(
@@ -489,13 +690,17 @@ class MyWorksPage extends StatelessWidget {
   }
 }
 
+// الإعدادات
+
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
+      appBar: AppBar(
+        title: const Text('الإعدادات'),
+      ),
       body: const Padding(
         padding: EdgeInsets.all(20),
         child: Column(

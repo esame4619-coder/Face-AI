@@ -16,13 +16,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
 
-      - name: Create Flutter Project
-        run: flutter create --project-name face_ai --platforms=android --org com.esame.faceai .
+      - name: Create Android Project Files
+        run: |
+          flutter create --project-name face_ai --platforms=android --org com.esame.faceai scaffold
+          cp -R scaffold/android ./android
 
       - name: Get Dependencies
         run: flutter pub get
@@ -30,7 +38,7 @@ jobs:
       - name: Build APK
         run: flutter build apk --release
 
-      - name: Save APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Face-AI-APK

@@ -15,16 +15,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install FaceFusion
-RUN git clone --depth 1 \
+# Install FaceFusion 3.9.2
+RUN git clone --depth 1 --branch 3.9.2 \
     https://github.com/facefusion/facefusion.git \
     /opt/facefusion
 
 WORKDIR /opt/facefusion
 
+# Install CPU runtime
 RUN python install.py --onnxruntime default
 
-# Install our backend
+# Install application backend
 WORKDIR /app
 
 COPY requirements.txt .

@@ -1,7 +1,15 @@
+import asyncio
+import tempfile
+from pathlib import Path
+from io import BytesIO
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from PIL import Image
-from io import BytesIO
+
+from engine import face_swap_engine
+
 
 app = FastAPI(
     title="Al Mohtarif AI Engine",
@@ -32,8 +40,8 @@ async def home():
 async def health():
     return {
         "status": "online",
-        "engine": "not_configured",
-        "message": "AI server is ready"
+        "engine": "FaceFusion",
+        "engine_available": face_swap_engine.is_available()
     }
 
 
@@ -63,7 +71,40 @@ async def face_swap(
     source_data = await validate_image(source)
     target_data = await validate_image(target)
 
-    raise HTTPException(
-        status_code=503,
-        detail="Face swap engine is not installed yet"
-    )
+    if not face_swap_engine.is_available():
+        raise HTTPException(
+            503,
+            "FaceFusion engine is not installed"
+        )
+
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+
+            output_path = Path(temp_dir) / "faceswap.png"
+
+            await asyncio.to_thread(
+                face_swap_engine.swap_faces,
+                source_data,
+                target_data,
+                str(output_path)
+            )
+
+            if not output_path.exists():
+                raise RuntimeError("Output image was not generated")
+
+            result = output_path.read_bytes()
+
+        return Response(
+            content=result,
+            media_type="image/png",
+            headers={
+                "Content-Disposition":
+                "attachment; filename=faceswap.png"
+            }
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            500,
+            f"Face swap failed: {str(error)}"
+        )

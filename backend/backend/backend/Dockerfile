@@ -23,7 +23,7 @@ RUN git clone --depth 1 --branch 3.9.2 \
 WORKDIR /opt/facefusion
 
 # Install CPU runtime
-RUN python install.py --onnxruntime default
+RUN python install.RUN python install.py default --skip-conda
 
 # Install application backend
 WORKDIR /app

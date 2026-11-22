@@ -90,7 +90,7 @@ class HomePage extends StatelessWidget {
       'description': 'تبديل الوجوه في الصور',
       'icon': Icons.face_retouching_natural,
       'color': Color(0xFF8B5CF6),
-      'type': 'image',
+      'type': 'faceswap',
     },
     {
       'name': 'استوديو الفيديو',

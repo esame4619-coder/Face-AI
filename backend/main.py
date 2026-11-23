@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 from engine import face_swap_engine
+from worker_pool import dispatch_faceswap, pool_status
 
 
 app = FastAPI(
@@ -52,8 +53,17 @@ async def health():
     return {
         "status": "online",
         "engine": "FaceFusion",
-        "engine_available": face_swap_engine.is_available()
+        "engine_available": face_swap_engine.is_available(),
+        "worker_pool_configured": bool(os.getenv("WORKERS_JSON", "").strip()),
     }
+
+
+@app.get("/pool/status")
+async def worker_pool_status(_auth: None = Depends(verify_api_key)):
+    try:
+        return await pool_status()
+    except Exception as error:
+        raise HTTPException(503, f"Could not read worker pool status: {error}")
 
 
 async def validate_image(file: UploadFile):
@@ -129,40 +139,35 @@ async def face_swap(
     source_data = await validate_image(source)
     target_data = await validate_image(target)
 
-    if not face_swap_engine.is_available():
-        raise HTTPException(
-            503,
-            "FaceFusion engine is not installed"
-        )
-
     try:
-        with tempfile.TemporaryDirectory() as temp_dir:
-
-            output_path = Path(temp_dir) / "faceswap.png"
-
-            await asyncio.to_thread(
-                face_swap_engine.swap_faces,
-                source_data,
-                target_data,
-                str(output_path)
-            )
-
-            if not output_path.exists():
-                raise RuntimeError("Output image was not generated")
-
-            result = output_path.read_bytes()
+        if os.getenv("WORKERS_JSON", "").strip():
+            result, worker_name = await dispatch_faceswap(source_data, target_data)
+        else:
+            if not face_swap_engine.is_available():
+                raise HTTPException(503, "FaceFusion engine is not installed and no remote workers are configured")
+            with tempfile.TemporaryDirectory() as temp_dir:
+                output_path = Path(temp_dir) / "faceswap.png"
+                await asyncio.to_thread(
+                    face_swap_engine.swap_faces,
+                    source_data,
+                    target_data,
+                    str(output_path)
+                )
+                if not output_path.exists():
+                    raise RuntimeError("Output image was not generated")
+                result = output_path.read_bytes()
+            worker_name = "local"
 
         return Response(
             content=result,
             media_type="image/png",
             headers={
-                "Content-Disposition":
-                "attachment; filename=faceswap.png"
+                "Content-Disposition": "attachment; filename=faceswap.png",
+                "X-Worker-Name": worker_name,
             }
         )
 
+    except HTTPException:
+        raise
     except Exception as error:
-        raise HTTPException(
-            500,
-            f"Face swap failed: {str(error)}"
-        )
+        raise HTTPException(503, f"Face swap unavailable: {str(error)}")

@@ -340,7 +340,38 @@ class _FaceSwapStudioState extends State<FaceSwapStudio> {
     setState(() => isProcessing = true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      final baseUrl = (prefs.getString('backend_url') ?? '').trim().replaceAll(RegExp(r'/+
+      var baseUrl = (prefs.getString('backend_url') ?? '').trim();
+      while (baseUrl.endsWith('/')) {
+        baseUrl = baseUrl.substring(0, baseUrl.length - 1);
+      }
+      if (baseUrl.isEmpty) {
+        throw Exception('احفظ عنوان خادم المعالجة من الإعدادات أولاً.');
+      }
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/api/faceswap'));
+      request.files.add(await http.MultipartFile.fromPath('source', sourceFace!.path));
+      request.files.add(await http.MultipartFile.fromPath('target', targetImage!.path));
+      final streamed = await request.send().timeout(const Duration(minutes: 6));
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode != 200) {
+        throw Exception('الخادم رد برمز ${response.statusCode}.');
+      }
+      final directory = await getApplicationDocumentsDirectory();
+      final output = File('${directory.path}/faceswap_${DateTime.now().millisecondsSinceEpoch}.png');
+      await output.writeAsBytes(response.bodyBytes, flush: true);
+      if (!mounted) return;
+      setState(() => resultImage = output);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تبديل الوجه وحفظ النتيجة داخل التطبيق.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تبديل الوجه: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => isProcessing = false);
+    }
+  }
 
   Future<void> selectImage(bool isFace) async {
     try {
@@ -543,7 +574,35 @@ class _ImageStudioState extends State<ImageStudio> {
     setState(() => isEnhancing = true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      final baseUrl = (prefs.getString('backend_url') ?? '').trim().replaceAll(RegExp(r'/+
+      var baseUrl = (prefs.getString('backend_url') ?? '').trim();
+      while (baseUrl.endsWith('/')) {
+        baseUrl = baseUrl.substring(0, baseUrl.length - 1);
+      }
+      if (baseUrl.isEmpty) throw Exception('احفظ عنوان خادم المعالجة من الإعدادات أولاً.');
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/api/enhance'));
+      request.files.add(await http.MultipartFile.fromPath('image', selectedImage!.path));
+      final streamed = await request.send().timeout(const Duration(minutes: 2));
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode != 200) throw Exception('الخادم رد برمز ${response.statusCode}.');
+      final directory = await getApplicationDocumentsDirectory();
+      final output = File('${directory.path}/enhanced_${DateTime.now().millisecondsSinceEpoch}.png');
+      await output.writeAsBytes(response.bodyBytes, flush: true);
+      if (!mounted) return;
+      setState(() => enhancedImage = output);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحسين الصورة وحفظ النتيجة داخل التطبيق.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحسين الصورة: $error')));
+    } finally {
+      if (mounted) setState(() => isEnhancing = false);
+    }
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          widget.enhance ? 'تحسين الصور' : 'استوديو الصور',
         ),
       ),
       body: Padding(
@@ -733,7 +792,6 @@ class MyWorksPage extends StatelessWidget {
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
-
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -742,47 +800,37 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController controller = TextEditingController();
   bool isLoading = true;
   bool isTesting = false;
-
   @override
-  void initState() {
-    super.initState();
-    loadSettings();
-  }
-
+  void initState() { super.initState(); loadSettings(); }
   Future<void> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     controller.text = prefs.getString('backend_url') ?? '';
     if (mounted) setState(() => isLoading = false);
   }
-
-  String get normalizedUrl => controller.text.trim().replaceAll(RegExp(r'/+$'), '');
-
+  String normalizedUrl() {
+    var value = controller.text.trim();
+    while (value.endsWith('/')) { value = value.substring(0, value.length - 1); }
+    return value;
+  }
   Future<void> saveSettings() async {
-    final value = normalizedUrl;
+    final value = normalizedUrl();
     if (value.isNotEmpty) {
       final uri = Uri.tryParse(value);
       if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('اكتب عنواناً صحيحاً يبدأ بـ http:// أو https://')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب عنواناً صحيحاً يبدأ بـ http:// أو https://')));
         return;
       }
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('backend_url', value);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم حفظ عنوان خادم المعالجة.')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ عنوان خادم المعالجة.')));
   }
-
   Future<void> testConnection() async {
-    final value = normalizedUrl;
+    final value = normalizedUrl();
     final uri = Uri.tryParse('$value/health');
     if (value.isEmpty || uri == null || !uri.hasScheme || uri.host.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('اكتب عنوان خادم صحيح أولاً.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب عنوان خادم صحيح أولاً.')));
       return;
     }
     setState(() => isTesting = true);
@@ -792,36 +840,19 @@ class _SettingsPageState extends State<SettingsPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final available = data['engine_available'] == true;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              available
-                  ? 'الاتصال ناجح ومحرك FaceFusion متاح.'
-                  : 'الاتصال ناجح، لكن محرك FaceFusion غير مثبت على الخادم بعد.',
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(available ? 'الاتصال ناجح ومحرك FaceFusion متاح.' : 'الاتصال ناجح، لكن محرك FaceFusion غير مثبت على الخادم بعد.')));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('الخادم رد برمز ${response.statusCode}.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('الخادم رد برمز ${response.statusCode}.')));
       }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر الاتصال بالخادم: $error')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر الاتصال بالخادم: $error')));
     } finally {
       if (mounted) setState(() => isTesting = false);
     }
   }
-
   @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
+  void dispose() { controller.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -831,66 +862,22 @@ class _SettingsPageState extends State<SettingsPage> {
           : ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                const ListTile(
-                  leading: Icon(Icons.person_outline),
-                  title: Text('المستخدم الشخصي'),
-                  subtitle: Text('تطبيقك الخاص'),
-                ),
+                const ListTile(leading: Icon(Icons.person_outline), title: Text('المستخدم الشخصي'), subtitle: Text('تطبيقك الخاص')),
                 const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.language),
-                  title: Text('اللغة'),
-                  subtitle: Text('العربية'),
-                ),
+                const ListTile(leading: Icon(Icons.language), title: Text('اللغة'), subtitle: Text('العربية')),
                 const Divider(),
-                const Text(
-                  'خادم المعالجة المجاني',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+                const Text('خادم المعالجة المجاني', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                const Text(
-                  'اكتب عنوان جهازك الذي يشغّل Backend المحترف في AI. '
-                  'مثال: http://192.168.1.5:8000 — لا تكتب localhost عند استخدام الهاتف.',
-                  style: TextStyle(color: Colors.white60),
-                ),
+                const Text('اكتب عنوان جهازك الذي يشغّل Backend المحترف في AI. مثال: http://192.168.1.5:8000 — لا تكتب localhost عند استخدام الهاتف.', style: TextStyle(color: Colors.white60)),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.url,
-                  textDirection: TextDirection.ltr,
-                  decoration: const InputDecoration(
-                    hintText: 'http://192.168.1.5:8000',
-                    border: OutlineInputBorder(),
-                    labelText: 'عنوان خادم المعالجة',
-                  ),
-                ),
+                TextField(controller: controller, keyboardType: TextInputType.url, textDirection: TextDirection.ltr, decoration: const InputDecoration(hintText: 'http://192.168.1.5:8000', border: OutlineInputBorder(), labelText: 'عنوان خادم المعالجة')),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: saveSettings,
-                    icon: const Icon(Icons.save),
-                    label: const Text('حفظ الإعدادات'),
-                  ),
-                ),
+                SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: saveSettings, icon: const Icon(Icons.save), label: const Text('حفظ الإعدادات'))),
                 const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: isTesting ? null : testConnection,
-                    icon: isTesting
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.wifi_tethering),
-                    label: const Text('اختبار الاتصال بالخادم'),
-                  ),
-                ),
+                SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: isTesting ? null : testConnection, icon: isTesting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.wifi_tethering), label: const Text('اختبار الاتصال بالخادم'))),
                 const SizedBox(height: 24),
                 const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('عن التطبيق'),
-                  subtitle: Text('المحترف في AI'),
-                ),
+                const ListTile(leading: Icon(Icons.info_outline), title: Text('عن التطبيق'), subtitle: Text('المحترف في AI')),
               ],
             ),
     );

@@ -35,6 +35,24 @@ jobs:
         run: |
           flutter create --project-name face_ai --platforms=android --org com.esame.faceai scaffold
           cp -R scaffold/android ./android
+          python3 - <<'PY'
+          from pathlib import Path
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          content = manifest.read_text()
+          if "android.permission.INTERNET" not in content:
+              content = content.replace(
+                  "<application",
+                  '<uses-permission android:name="android.permission.INTERNET" />\\n\\n    <application',
+                  1,
+              )
+          if "android:usesCleartextTraffic" not in content:
+              content = content.replace(
+                  "<application",
+                  '<application android:usesCleartextTraffic="true"',
+                  1,
+              )
+          manifest.write_text(content)
+          PY
 
       - name: Get Dependencies
         run: flutter pub get

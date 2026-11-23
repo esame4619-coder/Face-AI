@@ -1,11 +1,15 @@
+import asyncio
 from io import BytesIO
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from PIL import Image
+from starlette.datastructures import Headers, UploadFile
+import pytest
 
 import main
 
@@ -59,3 +63,31 @@ def test_faceswap_returns_service_unavailable_without_engine(monkeypatch):
     )
     assert response.status_code == 503
     assert "FaceFusion" in response.json()["detail"]
+
+
+
+def test_validate_image_rejects_excessive_dimensions(monkeypatch):
+    class OversizedImage:
+        size = (5001, 5000)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def verify(self):
+            return None
+
+    monkeypatch.setattr(main.Image, "open", lambda *_args, **_kwargs: OversizedImage())
+    upload = UploadFile(
+        filename="large.png",
+        file=BytesIO(b"image-data"),
+        headers=Headers({"content-type": "image/png"}),
+    )
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(main.validate_image(upload))
+
+    assert error.value.status_code == 413
+    assert "dimensions" in error.value.detail

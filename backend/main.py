@@ -26,6 +26,7 @@ app.add_middleware(
 )
 
 MAX_FILE_SIZE = 15 * 1024 * 1024
+MAX_IMAGE_PIXELS = 25_000_000
 
 
 @app.get("/")
@@ -55,8 +56,13 @@ async def validate_image(file: UploadFile):
         raise HTTPException(413, "Image is too large")
 
     try:
-        image = Image.open(BytesIO(data))
-        image.verify()
+        with Image.open(BytesIO(data)) as image:
+            width, height = image.size
+            if width < 1 or height < 1 or width * height > MAX_IMAGE_PIXELS:
+                raise HTTPException(413, "Image dimensions are too large")
+            image.verify()
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(400, "Cannot read image")
 

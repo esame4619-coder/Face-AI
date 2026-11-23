@@ -1,0 +1,139 @@
+name: Import Face-AI source and build APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: face-ai-import-and-build-main
+  cancel-in-progress: false
+
+jobs:
+  import-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Validate and import V1.28.17 source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP_FILE="$(find . -maxdepth 1 -type f -name 'Face-AI-v1.28.17*.zip' -print -quit)"
+          if [[ -z "$ZIP_FILE" ]]; then
+            echo "لم يتم العثور على ملف Face-AI-v1.28.17*.zip في جذر المستودع." >&2
+            exit 1
+          fi
+          TEMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEMP_DIR"' EXIT
+          if unzip -Z1 "$ZIP_FILE" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo "ملف ZIP يحتوي على مسارات غير آمنة." >&2
+            exit 1
+          fi
+          unzip -q "$ZIP_FILE" -d "$TEMP_DIR"
+          mapfile -t PROJECT_DIRS < <(find "$TEMP_DIR" -mindepth 1 -maxdepth 1 -type d -print)
+          if [[ ${#PROJECT_DIRS[@]} -ne 1 ]]; then
+            echo "الأرشيف يجب أن يحتوي مجلد مشروع واحدًا فقط." >&2
+            exit 1
+          fi
+          PROJECT_DIR="${PROJECT_DIRS[0]}"
+          test -s "$PROJECT_DIR/lib/main.dart"
+          test -s "$PROJECT_DIR/pubspec.yaml"
+          grep -q '^version: 1\.28\.17+45$' "$PROJECT_DIR/pubspec.yaml"
+          grep -q 'class MohtarifAI' "$PROJECT_DIR/lib/main.dart"
+          rsync -a --delete \
+            --exclude='/.git/' \
+            --exclude='/.github/workflows/import-face-ai-zip.yml' \
+            "$PROJECT_DIR/" ./
+          rm -f "$ZIP_FILE"
+
+      - name: Set up Python for backend tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      - name: Run backend tests
+        working-directory: backend
+        run: python -m pytest -q
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter 3.24.5
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          cache: true
+
+      - name: Verify application source
+        run: |
+          set -euo pipefail
+          test -s lib/main.dart
+          test -s pubspec.yaml
+          grep -q '^version: 1\.28\.17+45$' pubspec.yaml
+          grep -q 'class MohtarifAI' lib/main.dart
+          sha256sum lib/main.dart > /tmp/main-before.sha256
+
+      - name: Generate Android host without replacing app source
+        run: bash scripts/prepare_android.sh
+
+      - name: Verify app source was preserved
+        run: sha256sum -c /tmp/main-before.sha256
+
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart source
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        run: flutter test --reporter expanded
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Validate APK
+        run: |
+          set -euo pipefail
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK"
+          unzip -t "$APK"
+          sha256sum "$APK"
+
+      - name: Commit imported source to main
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "لا توجد تغييرات مصدر جديدة للحفظ."
+          else
+            git commit -m "Import Face-AI V1.28.17 source"
+            git push origin HEAD:main
+          fi
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mohtarif-AI-Android-${{ github.run_number }}
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14

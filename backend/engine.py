@@ -66,13 +66,14 @@ class FaceSwapEngine:
         with tempfile.TemporaryDirectory(prefix="mohtarif-video-") as temp_dir:
             source_path = Path(temp_dir) / "source.png"
             target_path = Path(temp_dir) / "target.mp4"
+            processed_path = Path(temp_dir) / "processed.mp4"
             source_path.write_bytes(source_image)
             target_path.write_bytes(target_video)
             command = [
                 self.python_path, str(self.facefusion_path), "headless-run",
                 "--source-paths", str(source_path),
                 "--target-path", str(target_path),
-                "--output-path", str(output),
+                "--output-path", str(processed_path),
                 "--processors", "face_swapper",
             ]
             completed = subprocess.run(
@@ -82,8 +83,20 @@ class FaceSwapEngine:
             if completed.returncode != 0:
                 detail = (completed.stderr or completed.stdout or "").strip()
                 raise RuntimeError(detail[-4000:] or "FaceFusion video processing failed")
-            if not output.is_file() or output.stat().st_size == 0:
+            if not processed_path.is_file() or processed_path.stat().st_size == 0:
                 raise RuntimeError("FaceFusion finished without creating an MP4 video")
+
+            # Keep the original soundtrack, even when FaceFusion outputs a silent video.
+            mux = subprocess.run(
+                ["ffmpeg", "-y", "-i", str(processed_path), "-i", str(target_path),
+                 "-map", "0:v:0", "-map", "1:a:0?", "-c:v", "copy",
+                 "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart",
+                 str(output)],
+                capture_output=True, text=True, timeout=600, check=False,
+            )
+            if mux.returncode != 0 or not output.is_file() or output.stat().st_size == 0:
+                detail = (mux.stderr or mux.stdout or "").strip()
+                raise RuntimeError(detail[-3000:] or "Could not preserve original video audio")
         return output
 
 

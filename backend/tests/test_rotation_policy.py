@@ -47,3 +47,21 @@ def test_worker_groups_separate_active_warming_and_sleeping():
     assert [w["name"] for w in warming] == ["warm"]
     assert [w["name"] for w in sleeping] == ["sleep"]
     assert invalid == []
+
+
+def test_next_rotation_transition_finds_warmup_boundary():
+    from rotation_policy import next_rotation_transition
+
+    workers = [{"name": "worker-a", "rotation": {
+        "enabled": True, "active_from": "08:00", "active_until": "12:00",
+        "timezone": "UTC", "warmup_minutes": 10
+    }}]
+    now = datetime(2026, 11, 23, 7, 40, tzinfo=timezone.utc)
+    assert next_rotation_transition(workers, now) == "2026-11-23T07:50:00+00:00"
+
+
+def test_next_rotation_transition_is_none_for_always_active_workers():
+    from rotation_policy import next_rotation_transition
+
+    assert next_rotation_transition([{"name": "legacy", "rotation": {}}],
+                                    datetime(2026, 11, 23, 7, 40, tzinfo=timezone.utc)) is None

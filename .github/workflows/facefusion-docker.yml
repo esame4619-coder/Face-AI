@@ -54,11 +54,11 @@ jobs:
             /opt/facefusion/facefusion.py headless-run \
               --source-paths /test-data/source.jpg \
               --target-path /test-data/target.jpg \
-              --output-path /test-data/swapped.png \
+              --output-path /test-data/swapped.jpg \
               --processors face_swapper
-          test -s "$RUNNER_TEMP/facefusion-test/swapped.png"
+          test -s "$RUNNER_TEMP/facefusion-test/swapped.jpg"
           docker run --rm \
             -v "$RUNNER_TEMP/facefusion-test:/test-data" \
             --entrypoint python \
             mohtarif-face-ai:ci \
-            -c "from PIL import Image; im=Image.open('/test-data/swapped.png'); im.verify(); print('REAL INFERENCE OUTPUT:', im.format, im.size)"
+            -c "from PIL import Image; im=Image.open('/test-data/swapped.jpg'); im.verify(); print('REAL INFERENCE OUTPUT:', im.format, im.size)"

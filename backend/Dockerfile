@@ -14,7 +14,7 @@ RUN git clone --depth 1 --branch 3.9.2 \
     https://github.com/facefusion/facefusion.git /opt/facefusion
 
 WORKDIR /opt/facefusion
-RUN python install.py --onnxruntime default
+RUN python install.py default --skip-conda
 
 WORKDIR /app
 COPY requirements.txt .

@@ -57,9 +57,34 @@ class FaceSwapEngine:
 
         return output
 
-
-face_swap_engine = FaceSwapEngine()
-
+    def swap_video(self, source_image: bytes, target_video: bytes, output_path: str):
+        """Run FaceFusion on a video target; FaceFusion processes its frames."""
+        if not self.is_available():
+            raise RuntimeError("FaceFusion is not installed.")
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="mohtarif-video-") as temp_dir:
+            source_path = Path(temp_dir) / "source.png"
+            target_path = Path(temp_dir) / "target.mp4"
+            source_path.write_bytes(source_image)
+            target_path.write_bytes(target_video)
+            command = [
+                self.python_path, str(self.facefusion_path), "headless-run",
+                "--source-paths", str(source_path),
+                "--target-path", str(target_path),
+                "--output-path", str(output),
+                "--processors", "face_swapper",
+            ]
+            completed = subprocess.run(
+                command, capture_output=True, text=True, timeout=3600,
+                cwd=str(self.facefusion_path.parent), check=False,
+            )
+            if completed.returncode != 0:
+                detail = (completed.stderr or completed.stdout or "").strip()
+                raise RuntimeError(detail[-4000:] or "FaceFusion video processing failed")
+            if not output.is_file() or output.stat().st_size == 0:
+                raise RuntimeError("FaceFusion finished without creating an MP4 video")
+        return output
 
 
 face_swap_engine = FaceSwapEngine()

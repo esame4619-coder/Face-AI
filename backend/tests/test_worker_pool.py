@@ -159,3 +159,40 @@ def test_pool_status_coverage_requires_quota_ready_worker(monkeypatch, tmp_path)
     assert result["ready_active"] == 0
     assert result["coverage_gap"] is True
     assert result["workers"][0]["available_by_quota"] is False
+
+
+def test_dispatch_keeps_inflight_request_until_worker_responds(monkeypatch, tmp_path):
+    import asyncio
+    import worker_pool
+
+    monkeypatch.setenv("POOL_DB_PATH", str(tmp_path / "inflight.sqlite3"))
+    monkeypatch.setenv("WORKERS_JSON", json.dumps([
+        {"name": "worker-a", "url": "https://worker-a.example", "daily_jobs": 5}
+    ]))
+    worker = worker_pool._workers()[0]
+    monkeypatch.setattr(
+        worker_pool, "scheduled_workers",
+        lambda _workers: ([worker], [], [], [])
+    )
+
+    class Response:
+        is_success = True
+        status_code = 200
+        content = b"completed-after-window"
+        def json(self): return {"status": "online"}
+
+    class Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return False
+        async def get(self, url, **kwargs): return Response()
+        async def post(self, url, **kwargs):
+            await asyncio.sleep(0.03)  # Simulate the rotation boundary passing.
+            return Response()
+
+    monkeypatch.setattr(worker_pool.httpx, "AsyncClient", lambda **kwargs: Client())
+    result, worker_name = asyncio.run(
+        worker_pool.dispatch_faceswap(b"source", b"target")
+    )
+
+    assert result == b"completed-after-window"
+    assert worker_name == "worker-a"

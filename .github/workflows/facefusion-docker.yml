@@ -1,0 +1,38 @@
+name: FaceFusion Docker Build Check
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "backend/Dockerfile"
+      - "backend/engine.py"
+      - ".github/workflows/facefusion-docker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build CPU backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          tags: mohtarif-face-ai:ci
+          load: true
+          cache-from: type=gha,scope=facefusion-cpu
+          cache-to: type=gha,mode=max,scope=facefusion-cpu
+
+      - name: Verify FaceFusion installation and CLI
+        run: |
+          docker run --rm --entrypoint python mohtarif-face-ai:ci /opt/facefusion/facefusion.py --help
+          docker run --rm --entrypoint python mohtarif-face-ai:ci /opt/facefusion/facefusion.py headless-run --help

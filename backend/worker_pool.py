@@ -14,7 +14,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
-from rotation_policy import scheduled_workers
+from rotation_policy import scheduled_workers, next_rotation_transition
 
 _MAX_FAILOVER = 3
 _REQUEST_TIMEOUT = 900.0
@@ -104,7 +104,8 @@ def _try_reserve_job(name: str, daily_limit: int) -> bool:
 async def pool_status() -> dict[str, Any]:
     workers = _workers()
     status = []
-    active, warming, sleeping, invalid = scheduled_workers(workers)
+    now = datetime.now(timezone.utc)
+    active, warming, sleeping, invalid = scheduled_workers(workers, now)
     states = {w["name"]: "active" for w in active}
     states.update({w["name"]: "warming" for w in warming})
     states.update({w["name"]: "sleeping" for w in sleeping})
@@ -119,16 +120,34 @@ async def pool_status() -> dict[str, Any]:
                 online = False
             used = await asyncio.to_thread(_used_today, worker["name"])
             limit = worker["daily_jobs"]
+            quota_ok = not limit or used < limit
+            state = states.get(worker["name"], "invalid")
+            accepting = state == "active" and online and quota_ok
             status.append({
                 "name": worker["name"],
                 "online": online,
+                "health_state": "healthy" if online else "unreachable",
                 "jobs_used_today": used,
                 "daily_jobs_limit": limit if limit else None,
-                "available_by_quota": (not limit or used < limit),
-                "rotation_state": states.get(worker["name"], "invalid"),
-                "accepting_new_jobs": states.get(worker["name"]) == "active" and online and (not limit or used < limit),
+                "available_by_quota": quota_ok,
+                "rotation_state": state,
+                "accepting_new_jobs": accepting,
             })
-    return {"configured": len(workers), "active_scheduled": len(active), "warming": len(warming), "workers": status}
+    healthy_active = sum(1 for item in status if item["rotation_state"] == "active" and item["online"])
+    minimum_active = max(1, int(os.getenv("MIN_ACTIVE_WORKERS", "1")))
+    coverage_gap = len(active) < minimum_active or healthy_active < minimum_active
+    return {
+        "configured": len(workers),
+        "active_scheduled": len(active),
+        "healthy_active": healthy_active,
+        "minimum_active_required": minimum_active,
+        "warming": len(warming),
+        "sleeping": len(sleeping),
+        "invalid_rotation": len(invalid),
+        "coverage_gap": coverage_gap,
+        "next_transition": next_rotation_transition(workers, now),
+        "workers": status,
+    }
 
 
 async def dispatch_faceswap(source: bytes, target: bytes) -> tuple[bytes, str]:

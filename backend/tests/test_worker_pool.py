@@ -231,3 +231,18 @@ def test_dispatch_skips_unhealthy_worker_and_hands_over(monkeypatch, tmp_path):
     assert name == "worker-b"
     assert worker_pool._used_today("worker-a") == 0
     assert worker_pool._used_today("worker-b") == 1
+
+
+def test_daily_quota_reservation_is_atomic_under_concurrency(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    monkeypatch.setenv("POOL_DB_PATH", str(tmp_path / "concurrent-quota.sqlite3"))
+    limit = 7
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        results = list(executor.map(
+            lambda _index: worker_pool._try_reserve_job("shared-worker", limit),
+            range(30),
+        ))
+
+    assert sum(results) == limit
+    assert worker_pool._used_today("shared-worker") == limit

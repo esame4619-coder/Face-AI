@@ -129,7 +129,7 @@ class HomePage extends StatelessWidget {
     },
     {
       'name': 'تحسين الصور',
-      'description': 'رفع الجودة وإزالة العيوب',
+      'description': 'تحسين أساسي وتكبير الصور',
       'icon': Icons.auto_awesome,
       'color': Color(0xFF3B82F6),
       'type': 'enhance',
@@ -648,6 +648,15 @@ class _ImageStudioState extends State<ImageStudio> {
                       ),
               ),
             ),
+            if (widget.enhance)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'المعالجة الحالية تضبط الألوان والحدة وتكبّر الصورة حتى 2x. تحسين أساسي، وليست بعدُ تقنية ترميم بالذكاء الاصطناعي.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,

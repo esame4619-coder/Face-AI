@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: face-ai-android-${{ github.ref }}
+  group: face-ai-android-v2-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -15,6 +15,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout

@@ -45,6 +45,7 @@ class FaceSwapEngine:
                 capture_output=True,
                 text=True,
                 timeout=300,
+                cwd=str(self.facefusion_path.parent),
                 check=False,
             )
             if completed.returncode != 0:

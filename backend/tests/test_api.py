@@ -91,3 +91,34 @@ def test_validate_image_rejects_excessive_dimensions(monkeypatch):
 
     assert error.value.status_code == 413
     assert "dimensions" in error.value.detail
+
+
+def test_validate_image_rejects_file_over_limit(monkeypatch):
+    monkeypatch.setattr(main, "MAX_FILE_SIZE", 8)
+    upload = UploadFile(
+        filename="large.png",
+        file=BytesIO(b"0123456789"),
+        headers=Headers({"content-type": "image/png"}),
+    )
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(main.validate_image(upload))
+    assert error.value.status_code == 413
+
+
+def test_pool_status_requires_api_key_when_configured(monkeypatch):
+    monkeypatch.setenv("API_KEY", "private-test-key")
+    response = client.get("/pool/status")
+    assert response.status_code == 401
+
+
+def test_pool_status_accepts_correct_api_key_when_configured(monkeypatch):
+    async def fake_pool_status():
+        return {"workers": []}
+    monkeypatch.setenv("API_KEY", "private-test-key")
+    monkeypatch.setattr(main, "pool_status", fake_pool_status)
+    response = client.get(
+        "/pool/status",
+        headers={"Authorization": "Bearer private-test-key"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"workers": []}

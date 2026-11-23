@@ -1,0 +1,36 @@
+name: Publish APK Download
+
+on:
+  workflow_run:
+    workflows: ["Build Face AI APK"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Face-AI-APK
+          path: release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Publish public APK release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-build-${{ github.event.workflow_run.id }}
+          name: Face AI APK build ${{ github.event.workflow_run.run_number }}
+          body: |
+            APK generated automatically by the Face AI Android build workflow.
+            This release asset is publicly downloadable and does not require an Actions artifact login.
+          files: release/app-release.apk
+          draft: false
+          prerelease: true
+          make_latest: false

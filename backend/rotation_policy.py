@@ -30,9 +30,10 @@ def rotation_state(config: dict, now: datetime | None = None) -> str:
     end_dt = datetime.combine(local.date(), end, tzinfo=zone)
     if end <= start:
         end_dt += timedelta(days=1)
-    if local < start_dt and end <= start:
-        start_dt -= timedelta(days=1)
-        end_dt -= timedelta(days=1)
+        previous_start = start_dt - timedelta(days=1)
+        previous_end = end_dt - timedelta(days=1)
+        if previous_start <= local < previous_end:
+            return "active"
     if start_dt <= local < end_dt:
         return "active"
     if timedelta(0) <= start_dt - local <= timedelta(minutes=warmup):

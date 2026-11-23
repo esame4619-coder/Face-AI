@@ -347,7 +347,9 @@ class _FaceSwapStudioState extends State<FaceSwapStudio> {
       if (baseUrl.isEmpty) {
         throw Exception('احفظ عنوان خادم المعالجة من الإعدادات أولاً.');
       }
+      final apiKey = (prefs.getString('backend_api_key') ?? '').trim();
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/api/faceswap'));
+      if (apiKey.isNotEmpty) request.headers['Authorization'] = 'Bearer $apiKey';
       request.files.add(await http.MultipartFile.fromPath('source', sourceFace!.path));
       request.files.add(await http.MultipartFile.fromPath('target', targetImage!.path));
       final streamed = await request.send().timeout(const Duration(minutes: 15));
@@ -587,7 +589,9 @@ class _ImageStudioState extends State<ImageStudio> {
         baseUrl = baseUrl.substring(0, baseUrl.length - 1);
       }
       if (baseUrl.isEmpty) throw Exception('احفظ عنوان خادم المعالجة من الإعدادات أولاً.');
+      final apiKey = (prefs.getString('backend_api_key') ?? '').trim();
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/api/enhance'));
+      if (apiKey.isNotEmpty) request.headers['Authorization'] = 'Bearer $apiKey';
       request.files.add(await http.MultipartFile.fromPath('image', selectedImage!.path));
       final streamed = await request.send().timeout(const Duration(minutes: 2));
       final response = await http.Response.fromStream(streamed);
@@ -963,6 +967,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController controller = TextEditingController();
+  final TextEditingController apiKeyController = TextEditingController();
   bool isLoading = true;
   bool isTesting = false;
   @override
@@ -970,6 +975,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     controller.text = prefs.getString('backend_url') ?? '';
+    apiKeyController.text = prefs.getString('backend_api_key') ?? '';
     if (mounted) setState(() => isLoading = false);
   }
   String normalizedUrl() {
@@ -988,6 +994,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('backend_url', value);
+    await prefs.setString('backend_api_key', apiKeyController.text.trim());
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ عنوان خادم المعالجة.')));
   }
@@ -1017,7 +1024,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
   @override
-  void dispose() { controller.dispose(); super.dispose(); }
+  void dispose() { controller.dispose(); apiKeyController.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1036,6 +1043,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 const Text('لا يوجد خادم منشور تلقائياً حتى الآن. هذا الحقل لا يعمل إلا بعد تشغيل خادم المحترف في AI على جهاز أو استضافته. عند استخدام الهاتف لا تكتب localhost؛ أدخل رابط الخادم الفعلي الذي يبدأ بـ https:// أو عنوان جهازك على نفس شبكة Wi‑Fi.', style: TextStyle(color: Colors.white60)),
                 const SizedBox(height: 12),
                 TextField(controller: controller, keyboardType: TextInputType.url, textDirection: TextDirection.ltr, decoration: const InputDecoration(hintText: 'http://192.168.1.5:8000', border: OutlineInputBorder(), labelText: 'عنوان خادم المعالجة')),
+                const SizedBox(height: 12),
+                TextField(controller: apiKeyController, obscureText: true, textDirection: TextDirection.ltr, decoration: const InputDecoration(labelText: 'مفتاح الوصول (اختياري إذا فعّله الخادم)', border: OutlineInputBorder())),
                 const SizedBox(height: 12),
                 SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: saveSettings, icon: const Icon(Icons.save), label: const Text('حفظ الإعدادات'))),
                 const SizedBox(height: 8),

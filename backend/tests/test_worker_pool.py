@@ -196,3 +196,38 @@ def test_dispatch_keeps_inflight_request_until_worker_responds(monkeypatch, tmp_
 
     assert result == b"completed-after-window"
     assert worker_name == "worker-a"
+
+
+def test_dispatch_skips_unhealthy_worker_and_hands_over(monkeypatch, tmp_path):
+    import asyncio
+
+    monkeypatch.setenv("POOL_DB_PATH", str(tmp_path / "handover.sqlite3"))
+    monkeypatch.setenv("WORKERS_JSON", json.dumps([
+        {"name": "worker-a", "url": "https://worker-a.example", "daily_jobs": 5},
+        {"name": "worker-b", "url": "https://worker-b.example", "daily_jobs": 5},
+    ]))
+    worker_pool._cursor = 0
+
+    class Response:
+        def __init__(self, online=True, content=b""):
+            self.is_success = True
+            self.status_code = 200
+            self.content = content
+            self._online = online
+        def json(self): return {"status": "online" if self._online else "offline"}
+
+    class Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return False
+        async def get(self, url, **kwargs):
+            return Response(online="worker-b" in url)
+        async def post(self, url, **kwargs):
+            return Response(content=b"handover-success")
+
+    monkeypatch.setattr(worker_pool.httpx, "AsyncClient", lambda **kwargs: Client())
+    result, name = asyncio.run(worker_pool.dispatch_faceswap(b"s", b"t"))
+
+    assert result == b"handover-success"
+    assert name == "worker-b"
+    assert worker_pool._used_today("worker-a") == 0
+    assert worker_pool._used_today("worker-b") == 1

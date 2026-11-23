@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import sqlite3
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
@@ -46,7 +47,9 @@ def _workers() -> list[dict[str, Any]]:
 
 
 def _db_path() -> str:
-    return os.getenv("POOL_DB_PATH", "/data/worker_pool.sqlite3")
+    path = Path(os.getenv("POOL_DB_PATH", "/data/worker_pool.sqlite3"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return str(path)
 
 
 def _used_today(name: str) -> int:
@@ -116,6 +119,7 @@ async def dispatch_faceswap(source: bytes, target: bytes) -> tuple[bytes, str]:
             for worker in ordered:
                 if attempted >= min(_MAX_FAILOVER, len(ordered)):
                     break
+                attempted += 1
                 used = await asyncio.to_thread(_used_today, worker["name"])
                 limit = worker["daily_jobs"]
                 if limit and used >= limit:
@@ -126,7 +130,6 @@ async def dispatch_faceswap(source: bytes, target: bytes) -> tuple[bytes, str]:
                     if not health.is_success or health.json().get("status") != "online":
                         errors.append(f"{worker['name']}: unhealthy")
                         continue
-                    attempted += 1
                     _reserve_job(worker["name"])
                     response = await client.post(
                         worker["url"] + "/api/faceswap",

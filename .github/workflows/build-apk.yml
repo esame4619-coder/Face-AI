@@ -3,6 +3,12 @@ name: Build Face AI APK
 on:
   push:
     branches: [main]
+    paths:
+      - "lib/**"
+      - "android/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
 concurrency:

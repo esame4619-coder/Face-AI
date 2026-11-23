@@ -753,37 +753,185 @@ class ComingSoonPage extends StatelessWidget {
   }
 }
 
-// صفحة أعمالي
+// صفحة أعمالي: تعرض النتائج المحفوظة محلياً على الهاتف
 
-class MyWorksPage extends StatelessWidget {
+class MyWorksPage extends StatefulWidget {
   const MyWorksPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.folder_open,
-            size: 65,
-            color: Colors.white54,
+  State<MyWorksPage> createState() => _MyWorksPageState();
+}
+
+class _MyWorksPageState extends State<MyWorksPage> {
+  List<File> works = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadWorks();
+  }
+
+  Future<void> loadWorks() async {
+    setState(() => isLoading = true);
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final entries = await directory.list().toList();
+      final found = entries
+          .whereType<File>()
+          .where((file) {
+            final name = file.uri.pathSegments.last;
+            return name.startsWith('faceswap_') ||
+                name.startsWith('enhanced_');
+          })
+          .toList()
+        ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+      if (mounted) setState(() => works = found);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر تحميل الأعمال المحفوظة.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  String titleFor(File file) {
+    final name = file.uri.pathSegments.last;
+    return name.startsWith('faceswap_') ? 'نتيجة تبديل وجه' : 'صورة محسّنة';
+  }
+
+  Future<void> deleteWork(File file) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف العمل'),
+        content: const Text('هل تريد حذف هذه النتيجة من الهاتف؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
           ),
-          SizedBox(height: 15),
-          Text(
-            'أعمالي',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'ستظهر هنا ملفاتك ونتائج أعمالك',
-            style: TextStyle(color: Colors.white54),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف'),
           ),
         ],
       ),
+    );
+    if (confirmed != true) return;
+    await file.delete();
+    await loadWorks();
+  }
+
+  void previewWork(File file) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(titleFor(file), style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Flexible(
+                child: InteractiveViewer(
+                  child: Image.file(file, fit: BoxFit.contain),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إغلاق'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('أعمالي'),
+        actions: [
+          IconButton(
+            onPressed: isLoading ? null : loadWorks,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'تحديث الأعمال',
+          ),
+        ],
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : works.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.folder_open, size: 65, color: Colors.white54),
+                      const SizedBox(height: 15),
+                      const Text('لسه مفيش أعمال محفوظة', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      const Text('نتائج تبديل الوجوه وتحسين الصور هتظهر هنا.', style: TextStyle(color: Colors.white54)),
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        onPressed: loadWorks,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('تحديث'),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: loadWorks,
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(14),
+                    itemCount: works.length,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.82,
+                    ),
+                    itemBuilder: (context, index) {
+                      final file = works[index];
+                      return InkWell(
+                        onTap: () => previewWork(file),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1B1E2E),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: Image.file(file, width: double.infinity, fit: BoxFit.cover),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: Text(titleFor(file), style: const TextStyle(fontSize: 12)),
+                                trailing: IconButton(
+                                  onPressed: () => deleteWork(file),
+                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                  tooltip: 'حذف',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
     );
   }
 }

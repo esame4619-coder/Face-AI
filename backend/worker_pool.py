@@ -110,39 +110,53 @@ async def pool_status() -> dict[str, Any]:
     states.update({w["name"]: "warming" for w in warming})
     states.update({w["name"]: "sleeping" for w in sleeping})
     states.update({name: "invalid" for name in invalid})
-    async with httpx.AsyncClient(timeout=8.0) as client:
-        for worker in workers:
-            headers = {"Authorization": f"Bearer {worker['api_key']}"} if worker["api_key"] else {}
+    probe_limit = asyncio.Semaphore(max(1, min(10, int(os.getenv("POOL_STATUS_CONCURRENCY", "10")))))
+
+    async def inspect_worker(client: httpx.AsyncClient, worker: dict[str, Any]) -> dict[str, Any]:
+        headers = {"Authorization": f"Bearer {worker['api_key']}"} if worker["api_key"] else {}
+        async with probe_limit:
             try:
-                response = await client.get(worker["url"] + "/health", headers=headers)
+                response = await client.get(
+                    worker["url"] + "/health", headers=headers, timeout=8.0
+                )
                 online = response.is_success and response.json().get("status") == "online"
             except Exception:
                 online = False
-            used = await asyncio.to_thread(_used_today, worker["name"])
-            limit = worker["daily_jobs"]
-            quota_ok = not limit or used < limit
-            state = states.get(worker["name"], "invalid")
-            accepting = state == "active" and online and quota_ok
-            status.append({
-                "name": worker["name"],
-                "online": online,
-                "health_state": "healthy" if online else "unreachable",
-                "jobs_used_today": used,
-                "daily_jobs_limit": limit if limit else None,
-                "available_by_quota": quota_ok,
-                "rotation_state": state,
-                "accepting_new_jobs": accepting,
-            })
-    healthy_active = sum(1 for item in status if item["rotation_state"] == "active" and item["online"])
+        used = await asyncio.to_thread(_used_today, worker["name"])
+        limit = worker["daily_jobs"]
+        quota_ok = not limit or used < limit
+        state = states.get(worker["name"], "invalid")
+        accepting = state == "active" and online and quota_ok
+        return {
+            "name": worker["name"],
+            "online": online,
+            "health_state": "healthy" if online else "unreachable",
+            "jobs_used_today": used,
+            "daily_jobs_limit": limit if limit else None,
+            "available_by_quota": quota_ok,
+            "rotation_state": state,
+            "accepting_new_jobs": accepting,
+        }
+
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        status = await asyncio.gather(
+            *(inspect_worker(client, worker) for worker in workers)
+        )
+    healthy_active = sum(
+        1 for item in status
+        if item["rotation_state"] == "active" and item["online"]
+    )
+    ready_active = sum(1 for item in status if item["accepting_new_jobs"])
     try:
         minimum_active = max(1, int(os.getenv("MIN_ACTIVE_WORKERS", "1")))
     except ValueError:
         minimum_active = 1
-    coverage_gap = len(active) < minimum_active or healthy_active < minimum_active
+    coverage_gap = len(active) < minimum_active or ready_active < minimum_active
     return {
         "configured": len(workers),
         "active_scheduled": len(active),
         "healthy_active": healthy_active,
+        "ready_active": ready_active,
         "minimum_active_required": minimum_active,
         "warming": len(warming),
         "sleeping": len(sleeping),

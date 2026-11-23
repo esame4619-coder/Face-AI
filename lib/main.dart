@@ -1011,8 +1011,14 @@ class _SettingsPageState extends State<SettingsPage> {
       if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final available = data['engine_available'] == true;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(available ? 'الاتصال ناجح ومحرك FaceFusion متاح.' : 'الاتصال ناجح، لكن محرك FaceFusion غير مثبت على الخادم بعد.')));
+        final poolConfigured = data['worker_pool_configured'] == true;
+        final engineAvailable = data['engine_available'] == true;
+        final message = poolConfigured
+            ? 'الاتصال بمدير المعالجة ناجح ومجموعة العمال مُعرّفة.'
+            : engineAvailable
+                ? 'الاتصال ناجح ومحرك FaceFusion المحلي متاح.'
+                : 'الاتصال ناجح، لكن لا توجد مجموعة عمال أو محرك محلي جاهز بعد.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('الخادم رد برمز ${response.statusCode}.')));
       }
@@ -1038,11 +1044,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 const Divider(),
                 const ListTile(leading: Icon(Icons.language), title: Text('اللغة'), subtitle: Text('العربية')),
                 const Divider(),
-                const Text('خادم المعالجة المجاني', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('مدير المعالجة ومجموعة السيرفرات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                const Text('لا يوجد خادم منشور تلقائياً حتى الآن. هذا الحقل لا يعمل إلا بعد تشغيل خادم المحترف في AI على جهاز أو استضافته. عند استخدام الهاتف لا تكتب localhost؛ أدخل رابط الخادم الفعلي الذي يبدأ بـ https:// أو عنوان جهازك على نفس شبكة Wi‑Fi.', style: TextStyle(color: Colors.white60)),
+                const Text('أدخل رابط خادم المدير بعد نشره. المدير يوزّع طلبات تبديل الوجوه على العمال المتاحين. احفظ مفتاح المدير إذا كان مفعّلاً. عند استخدام الهاتف لا تكتب localhost؛ أدخل رابط HTTPS الفعلي أو عنوان جهازك على نفس شبكة Wi‑Fi.', style: TextStyle(color: Colors.white60)),
                 const SizedBox(height: 12),
-                TextField(controller: controller, keyboardType: TextInputType.url, textDirection: TextDirection.ltr, decoration: const InputDecoration(hintText: 'http://192.168.1.5:8000', border: OutlineInputBorder(), labelText: 'عنوان خادم المعالجة')),
+                TextField(controller: controller, keyboardType: TextInputType.url, textDirection: TextDirection.ltr, decoration: const InputDecoration(hintText: 'http://192.168.1.5:8000', border: OutlineInputBorder(), labelText: 'رابط مدير المعالجة')),
                 const SizedBox(height: 12),
                 TextField(controller: apiKeyController, obscureText: true, textDirection: TextDirection.ltr, decoration: const InputDecoration(labelText: 'مفتاح الوصول (اختياري إذا فعّله الخادم)', border: OutlineInputBorder())),
                 const SizedBox(height: 12),

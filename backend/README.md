@@ -31,5 +31,6 @@ docker run --rm -p 8000:8000 mohtarif-ai-backend
 - `GET /` معلومات الخادم
 - `GET /health` حالة API وتوفر المحرك
 - `POST /api/faceswap` حقلا رفع صور: `source` و`target`
+- `POST /api/enhance` حقل رفع صورة: `image`؛ تحسين أساسي محلي بالتباين والألوان والحدة مع تكبير Lanczos حتى 2x. هذه المعالجة ليست نموذج Super-Resolution بالذكاء الاصطناعي.
 
 استخدم صورًا تملكها أو لديك إذن صريح من أصحابها.

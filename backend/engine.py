@@ -35,7 +35,7 @@ class FaceSwapEngine:
                 self.python_path,
                 str(self.facefusion_path),
                 "headless-run",
-                "--source-path", str(source_path),
+                "--source-paths", str(source_path),
                 "--target-path", str(target_path),
                 "--output-path", str(output),
                 "--processors", "face_swapper",

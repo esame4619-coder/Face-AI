@@ -99,3 +99,35 @@ def test_private_docker_worker_urls_require_explicit_opt_in(monkeypatch):
     monkeypatch.setenv("ALLOW_INSECURE_WORKER_URLS", "true")
     workers = worker_pool._workers()
     assert [worker["name"] for worker in workers] == ["internal"]
+
+
+def test_pool_status_reports_health_coverage_and_transition(monkeypatch, tmp_path):
+    import asyncio
+
+    monkeypatch.setenv("POOL_DB_PATH", str(tmp_path / "status.sqlite3"))
+    monkeypatch.setenv("WORKERS_JSON", json.dumps([
+        {"name": "worker-a", "url": "https://worker-a.example"}
+    ]))
+    monkeypatch.setenv("MIN_ACTIVE_WORKERS", "2")
+    monkeypatch.setattr(worker_pool, "_used_today", lambda _name: 0)
+
+    class Response:
+        is_success = True
+        def json(self): return {"status": "online"}
+
+    class Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return False
+        async def get(self, url, **kwargs): return Response()
+
+    monkeypatch.setattr(worker_pool.httpx, "AsyncClient", lambda **kwargs: Client())
+    result = asyncio.run(worker_pool.pool_status())
+
+    assert result["configured"] == 1
+    assert result["active_scheduled"] == 1
+    assert result["healthy_active"] == 1
+    assert result["minimum_active_required"] == 2
+    assert result["coverage_gap"] is True
+    assert result["workers"][0]["health_state"] == "healthy"
+    assert result["workers"][0]["accepting_new_jobs"] is True
+    assert result["next_transition"] is None

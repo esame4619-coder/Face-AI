@@ -34,7 +34,7 @@ def test_face_swap_builds_expected_facefusion_command(tmp_path, monkeypatch):
     assert "--output-path" in command
     assert "--processors" in command
     assert command[command.index("--processors") + 1] == "face_swapper"
-    assert captured["kwargs"]["timeout"] == 300
+    assert captured["kwargs"]["timeout"] == 900
     assert captured["kwargs"]["check"] is False
 
 

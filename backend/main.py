@@ -1,9 +1,11 @@
 import asyncio
+import os
+import secrets
 import tempfile
 from pathlib import Path
 from io import BytesIO
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
@@ -27,6 +29,14 @@ app.add_middleware(
 
 MAX_FILE_SIZE = 15 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
+
+
+async def verify_api_key(authorization: str | None = Header(default=None)):
+    expected = os.getenv('API_KEY', '').strip()
+    if expected:
+        supplied = authorization or ''
+        if not secrets.compare_digest(supplied, f'Bearer {expected}'):
+            raise HTTPException(status_code=401, detail='مفتاح الوصول غير صحيح أو غير موجود.')
 
 
 @app.get("/")
@@ -70,7 +80,7 @@ async def validate_image(file: UploadFile):
 
 
 @app.post("/api/enhance")
-async def enhance_image(image: UploadFile = File(...)):
+async def enhance_image(image: UploadFile = File(...), _auth: None = Depends(verify_api_key)):
     """Basic local enhancement: orientation correction, gentle contrast/color,
     sharpening and 2x Lanczos enlargement. This is not an AI super-resolution model.
     """
@@ -113,7 +123,8 @@ async def enhance_image(image: UploadFile = File(...)):
 @app.post("/api/faceswap")
 async def face_swap(
     source: UploadFile = File(...),
-    target: UploadFile = File(...)
+    target: UploadFile = File(...),
+    _auth: None = Depends(verify_api_key)
 ):
     source_data = await validate_image(source)
     target_data = await validate_image(target)

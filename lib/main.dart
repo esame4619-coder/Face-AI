@@ -336,11 +336,12 @@ class _FaceSwapStudioState extends State<FaceSwapStudio> {
   bool isProcessing = false;
 
   Future<void> runFaceSwap() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final prefs = await SharedPreferences.getInstance();
-    final baseUrl = (prefs.getString('backend_url') ?? '')
-        .trim()
-        .replaceAll(RegExp(r'/+
+    if (sourceFace == null || targetImage == null || isProcessing) return;
+    setState(() => isProcessing = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final baseUrl = (prefs.getString('backend_url') ?? '').trim().replaceAll(RegExp(r'/+
+
   Future<void> selectImage(bool isFace) async {
     try {
       final XFile? file = await picker.pickImage(
@@ -466,11 +467,7 @@ class _FaceSwapStudioState extends State<FaceSwapStudio> {
                     ? runFaceSwap
                     : null,
                 icon: isProcessing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.auto_awesome),
                 label: Text(isProcessing ? 'جاري تنفيذ تبديل الوجه...' : 'ابدأ تبديل الوجه'),
                 style: ElevatedButton.styleFrom(
@@ -481,20 +478,17 @@ class _FaceSwapStudioState extends State<FaceSwapStudio> {
               ),
             ),
             if (resultImage != null) ...[
-              const SizedBox(height: 18),
-              const Align(
-                alignment: Alignment.centerRight,
-                child: Text('النتيجة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
+              const Text('النتيجة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.file(resultImage!, height: 240, fit: BoxFit.contain),
+                child: Image.file(resultImage!, height: 220, fit: BoxFit.contain),
               ),
             ],
             const SizedBox(height: 15),
             const Text(
-              'تأكد من تشغيل خادم المعالجة وإدخال عنوانه في الإعدادات.',
+              'يمكنك تغيير أي صورة وإعادة اختيارها في أي وقت.',
               style: TextStyle(color: Colors.white54),
             ),
           ],
@@ -517,9 +511,9 @@ class ImageStudio extends StatefulWidget {
 
 class _ImageStudioState extends State<ImageStudio> {
   File? selectedImage;
-  final ImagePicker picker = ImagePicker();
   File? enhancedImage;
   bool isEnhancing = false;
+  final ImagePicker picker = ImagePicker();
 
   Future<void> pickImage(ImageSource source) async {
     try {
@@ -549,9 +543,7 @@ class _ImageStudioState extends State<ImageStudio> {
     setState(() => isEnhancing = true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      final baseUrl = (prefs.getString('backend_url') ?? '')
-          .trim()
-          .replaceAll(RegExp(r'/+
+      final baseUrl = (prefs.getString('backend_url') ?? '').trim().replaceAll(RegExp(r'/+
         ),
       ),
       body: Padding(
@@ -630,11 +622,7 @@ class _ImageStudioState extends State<ImageStudio> {
                 child: ElevatedButton.icon(
                   onPressed: isEnhancing ? null : enhanceSelectedImage,
                   icon: isEnhancing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.auto_fix_high),
                   label: Text(isEnhancing ? 'جاري تحسين الصورة...' : 'ابدأ تحسين الصورة'),
                 ),
@@ -753,6 +741,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController controller = TextEditingController();
   bool isLoading = true;
+  bool isTesting = false;
 
   @override
   void initState() {
@@ -766,8 +755,10 @@ class _SettingsPageState extends State<SettingsPage> {
     if (mounted) setState(() => isLoading = false);
   }
 
-  Future<void> testConnection() async {
-    final baseUrl = controller.text.trim().replaceAll(RegExp(r'/+
+  String get normalizedUrl => controller.text.trim().replaceAll(RegExp(r'/+$'), '');
+
+  Future<void> saveSettings() async {
+    final value = normalizedUrl;
     if (value.isNotEmpty) {
       final uri = Uri.tryParse(value);
       if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
@@ -785,92 +776,16 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                const ListTile(
-                  leading: Icon(Icons.person_outline),
-                  title: Text('المستخدم الشخصي'),
-                  subtitle: Text('تطبيقك الخاص'),
-                ),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.language),
-                  title: Text('اللغة'),
-                  subtitle: Text('العربية'),
-                ),
-                const Divider(),
-                const Text(
-                  'خادم المعالجة المجاني',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'اكتب عنوان جهازك الذي يشغّل Backend المحترف في AI. '
-                  'مثال: http://192.168.1.5:8000 — لا تكتب localhost عند استخدام الهاتف.',
-                  style: TextStyle(color: Colors.white60),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.url,
-                  textDirection: TextDirection.ltr,
-                  decoration: const InputDecoration(
-                    hintText: 'http://192.168.1.5:8000',
-                    border: OutlineInputBorder(),
-                    labelText: 'عنوان خادم المعالجة',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: saveSettings,
-                    icon: const Icon(Icons.save),
-                    label: const Text('حفظ الإعدادات'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: testConnection,
-                    icon: const Icon(Icons.wifi_tethering),
-                    label: const Text('اختبار الاتصال بالخادم'),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('عن التطبيق'),
-                  subtitle: Text('المحترف في AI'),
-                ),
-              ],
-            ),
-    );
-  }
-}
-), '');
-    final uri = Uri.tryParse('$baseUrl/health');
-    if (baseUrl.isEmpty || uri == null || !uri.hasScheme || uri.host.isEmpty) {
+  Future<void> testConnection() async {
+    final value = normalizedUrl;
+    final uri = Uri.tryParse('$value/health');
+    if (value.isEmpty || uri == null || !uri.hasScheme || uri.host.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('اكتب عنوان خادم صحيح أولاً.')),
       );
       return;
     }
+    setState(() => isTesting = true);
     try {
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       if (!mounted) return;
@@ -895,436 +810,10 @@ class _SettingsPageState extends State<SettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تعذر الاتصال بالخادم: $error')),
-      );
-    }
-  }
-
-  Future<void> saveSettings() async {
-    final value = controller.text.trim().replaceAll(RegExp(r'/+
-    if (value.isNotEmpty) {
-      final uri = Uri.tryParse(value);
-      if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('اكتب عنواناً صحيحاً يبدأ بـ http:// أو https://')),
-        );
-        return;
-      }
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('backend_url', value);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم حفظ عنوان خادم المعالجة.')),
-    );
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                const ListTile(
-                  leading: Icon(Icons.person_outline),
-                  title: Text('المستخدم الشخصي'),
-                  subtitle: Text('تطبيقك الخاص'),
-                ),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.language),
-                  title: Text('اللغة'),
-                  subtitle: Text('العربية'),
-                ),
-                const Divider(),
-                const Text(
-                  'خادم المعالجة المجاني',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'اكتب عنوان جهازك الذي يشغّل Backend المحترف في AI. '
-                  'مثال: http://192.168.1.5:8000 — لا تكتب localhost عند استخدام الهاتف.',
-                  style: TextStyle(color: Colors.white60),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.url,
-                  textDirection: TextDirection.ltr,
-                  decoration: const InputDecoration(
-                    hintText: 'http://192.168.1.5:8000',
-                    border: OutlineInputBorder(),
-                    labelText: 'عنوان خادم المعالجة',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: saveSettings,
-                    icon: const Icon(Icons.save),
-                    label: const Text('حفظ الإعدادات'),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('عن التطبيق'),
-                  subtitle: Text('المحترف في AI'),
-                ),
-              ],
-            ),
-    );
-  }
-}
-), '');
-    if (value.isNotEmpty) {
-      final uri = Uri.tryParse(value);
-      if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('اكتب عنواناً صحيحاً يبدأ بـ http:// أو https://')),
-        );
-        return;
-      }
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('backend_url', value);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم حفظ عنوان خادم المعالجة.')),
-    );
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                const ListTile(
-                  leading: Icon(Icons.person_outline),
-                  title: Text('المستخدم الشخصي'),
-                  subtitle: Text('تطبيقك الخاص'),
-                ),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.language),
-                  title: Text('اللغة'),
-                  subtitle: Text('العربية'),
-                ),
-                const Divider(),
-                const Text(
-                  'خادم المعالجة المجاني',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'اكتب عنوان جهازك الذي يشغّل Backend المحترف في AI. '
-                  'مثال: http://192.168.1.5:8000 — لا تكتب localhost عند استخدام الهاتف.',
-                  style: TextStyle(color: Colors.white60),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.url,
-                  textDirection: TextDirection.ltr,
-                  decoration: const InputDecoration(
-                    hintText: 'http://192.168.1.5:8000',
-                    border: OutlineInputBorder(),
-                    labelText: 'عنوان خادم المعالجة',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: saveSettings,
-                    icon: const Icon(Icons.save),
-                    label: const Text('حفظ الإعدادات'),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('عن التطبيق'),
-                  subtitle: Text('المحترف في AI'),
-                ),
-              ],
-            ),
-    );
-  }
-}
-), '');
-      if (baseUrl.isEmpty) {
-        throw Exception('احفظ عنوان خادم المعالجة من الإعدادات أولاً.');
-      }
-
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$baseUrl/api/enhance'),
-      );
-      request.files.add(
-        await http.MultipartFile.fromPath('image', selectedImage!.path),
-      );
-      final streamed = await request.send().timeout(
-        const Duration(minutes: 2),
-      );
-      final response = await http.Response.fromStream(streamed);
-      if (response.statusCode != 200) {
-        throw Exception('الخادم رفض المعالجة (${response.statusCode}).');
-      }
-
-      final directory = await getApplicationDocumentsDirectory();
-      final output = File(
-        '${directory.path}/enhanced_${DateTime.now().millisecondsSinceEpoch}.png',
-      );
-      await output.writeAsBytes(response.bodyBytes, flush: true);
-      if (!mounted) return;
-      setState(() => enhancedImage = output);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تحسين الصورة وحفظ النتيجة داخل التطبيق.')),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر تحسين الصورة: $error')),
       );
     } finally {
-      if (mounted) setState(() => isEnhancing = false);
+      if (mounted) setState(() => isTesting = false);
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.enhance ? 'تحسين الصور' : 'استوديو الصور',
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1B1E2E),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: selectedImage == null
-                    ? const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate_outlined,
-                            size: 75,
-                            color: Color(0xFF9B7BFA),
-                          ),
-                          SizedBox(height: 18),
-                          Text(
-                            'اختر صورة للبدء',
-                            style: TextStyle(fontSize: 18),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'يمكنك اختيار صورة من هاتفك',
-                            style: TextStyle(color: Colors.white54),
-                          ),
-                        ],
-                      )
-                    : ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: Image.file(
-                          selectedImage!,
-                          width: double.infinity,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => pickImage(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library),
-                label: const Text('اختيار صورة من المعرض'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.all(17),
-                  backgroundColor: const Color(0xFF7048C8),
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => pickImage(ImageSource.camera),
-                icon: const Icon(Icons.camera_alt),
-                label: const Text('التقاط صورة بالكاميرا'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.all(17),
-                ),
-              ),
-            ),
-            if (selectedImage != null) ...[
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: () {
-                  setState(() => selectedImage = null);
-                },
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('إزالة الصورة'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// الأدوات التي سيتم تطويرها
-
-class ComingSoonPage extends StatelessWidget {
-  final String title;
-
-  const ComingSoonPage({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.auto_awesome,
-              size: 75,
-              color: Color(0xFF9B7BFA),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 23,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'نجهز أدوات الاستوديو الخاص بك',
-              style: TextStyle(color: Colors.white60),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// صفحة أعمالي
-
-class MyWorksPage extends StatelessWidget {
-  const MyWorksPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.folder_open,
-            size: 65,
-            color: Colors.white54,
-          ),
-          SizedBox(height: 15),
-          Text(
-            'أعمالي',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'ستظهر هنا ملفاتك ونتائج أعمالك',
-            style: TextStyle(color: Colors.white54),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// الإعدادات
-
-class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
-
-  @override
-  State<SettingsPage> createState() => _SettingsPageState();
-}
-
-class _SettingsPageState extends State<SettingsPage> {
-  final TextEditingController controller = TextEditingController();
-  bool isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    loadSettings();
-  }
-
-  Future<void> loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    controller.text = prefs.getString('backend_url') ?? '';
-    if (mounted) setState(() => isLoading = false);
-  }
-
-  Future<void> testConnection() async {
-    final baseUrl = controller.text.trim().replaceAll(RegExp(r'/+
-    if (value.isNotEmpty) {
-      final uri = Uri.tryParse(value);
-      if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('اكتب عنواناً صحيحاً يبدأ بـ http:// أو https://')),
-        );
-        return;
-      }
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('backend_url', value);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم حفظ عنوان خادم المعالجة.')),
-    );
   }
 
   @override
@@ -1388,220 +877,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: testConnection,
-                    icon: const Icon(Icons.wifi_tethering),
+                    onPressed: isTesting ? null : testConnection,
+                    icon: isTesting
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.wifi_tethering),
                     label: const Text('اختبار الاتصال بالخادم'),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('عن التطبيق'),
-                  subtitle: Text('المحترف في AI'),
-                ),
-              ],
-            ),
-    );
-  }
-}
-), '');
-    final uri = Uri.tryParse('$baseUrl/health');
-    if (baseUrl.isEmpty || uri == null || !uri.hasScheme || uri.host.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('اكتب عنوان خادم صحيح أولاً.')),
-      );
-      return;
-    }
-    try {
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
-      if (!mounted) return;
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final available = data['engine_available'] == true;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              available
-                  ? 'الاتصال ناجح ومحرك FaceFusion متاح.'
-                  : 'الاتصال ناجح، لكن محرك FaceFusion غير مثبت على الخادم بعد.',
-            ),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('الخادم رد برمز ${response.statusCode}.')),
-        );
-      }
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر الاتصال بالخادم: $error')),
-      );
-    }
-  }
-
-  Future<void> saveSettings() async {
-    final value = controller.text.trim().replaceAll(RegExp(r'/+
-    if (value.isNotEmpty) {
-      final uri = Uri.tryParse(value);
-      if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('اكتب عنواناً صحيحاً يبدأ بـ http:// أو https://')),
-        );
-        return;
-      }
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('backend_url', value);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم حفظ عنوان خادم المعالجة.')),
-    );
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                const ListTile(
-                  leading: Icon(Icons.person_outline),
-                  title: Text('المستخدم الشخصي'),
-                  subtitle: Text('تطبيقك الخاص'),
-                ),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.language),
-                  title: Text('اللغة'),
-                  subtitle: Text('العربية'),
-                ),
-                const Divider(),
-                const Text(
-                  'خادم المعالجة المجاني',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'اكتب عنوان جهازك الذي يشغّل Backend المحترف في AI. '
-                  'مثال: http://192.168.1.5:8000 — لا تكتب localhost عند استخدام الهاتف.',
-                  style: TextStyle(color: Colors.white60),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.url,
-                  textDirection: TextDirection.ltr,
-                  decoration: const InputDecoration(
-                    hintText: 'http://192.168.1.5:8000',
-                    border: OutlineInputBorder(),
-                    labelText: 'عنوان خادم المعالجة',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: saveSettings,
-                    icon: const Icon(Icons.save),
-                    label: const Text('حفظ الإعدادات'),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('عن التطبيق'),
-                  subtitle: Text('المحترف في AI'),
-                ),
-              ],
-            ),
-    );
-  }
-}
-), '');
-    if (value.isNotEmpty) {
-      final uri = Uri.tryParse(value);
-      if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('اكتب عنواناً صحيحاً يبدأ بـ http:// أو https://')),
-        );
-        return;
-      }
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('backend_url', value);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم حفظ عنوان خادم المعالجة.')),
-    );
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                const ListTile(
-                  leading: Icon(Icons.person_outline),
-                  title: Text('المستخدم الشخصي'),
-                  subtitle: Text('تطبيقك الخاص'),
-                ),
-                const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.language),
-                  title: Text('اللغة'),
-                  subtitle: Text('العربية'),
-                ),
-                const Divider(),
-                const Text(
-                  'خادم المعالجة المجاني',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'اكتب عنوان جهازك الذي يشغّل Backend المحترف في AI. '
-                  'مثال: http://192.168.1.5:8000 — لا تكتب localhost عند استخدام الهاتف.',
-                  style: TextStyle(color: Colors.white60),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.url,
-                  textDirection: TextDirection.ltr,
-                  decoration: const InputDecoration(
-                    hintText: 'http://192.168.1.5:8000',
-                    border: OutlineInputBorder(),
-                    labelText: 'عنوان خادم المعالجة',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: saveSettings,
-                    icon: const Icon(Icons.save),
-                    label: const Text('حفظ الإعدادات'),
                   ),
                 ),
                 const SizedBox(height: 24),

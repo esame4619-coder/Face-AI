@@ -134,7 +134,7 @@ async def pool_status() -> dict[str, Any]:
                 "accepting_new_jobs": accepting,
             })
     healthy_active = sum(1 for item in status if item["rotation_state"] == "active" and item["online"])
-    minimum_active = max(1, int(os.getenv("MIN_ACTIVE_WORKERS", "1")))
+    try:\n        minimum_active = max(1, int(os.getenv("MIN_ACTIVE_WORKERS", "1")))\n    except ValueError:\n        minimum_active = 1
     coverage_gap = len(active) < minimum_active or healthy_active < minimum_active
     return {
         "configured": len(workers),

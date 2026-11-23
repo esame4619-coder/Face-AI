@@ -14,6 +14,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+from rotation_policy import scheduled_workers
 
 _MAX_FAILOVER = 3
 _REQUEST_TIMEOUT = 900.0
@@ -53,6 +54,7 @@ def _workers() -> list[dict[str, Any]]:
             "url": url,
             "api_key": str(item.get("api_key", "")),
             "daily_jobs": max(0, int(item.get("daily_jobs", 0))),
+            "rotation": item.get("rotation", {}) if isinstance(item.get("rotation", {}), dict) else {},
         })
     return result
 
@@ -102,6 +104,11 @@ def _try_reserve_job(name: str, daily_limit: int) -> bool:
 async def pool_status() -> dict[str, Any]:
     workers = _workers()
     status = []
+    active, warming, sleeping, invalid = scheduled_workers(workers)
+    states = {w["name"]: "active" for w in active}
+    states.update({w["name"]: "warming" for w in warming})
+    states.update({w["name"]: "sleeping" for w in sleeping})
+    states.update({name: "invalid" for name in invalid})
     async with httpx.AsyncClient(timeout=8.0) as client:
         for worker in workers:
             headers = {"Authorization": f"Bearer {worker['api_key']}"} if worker["api_key"] else {}
@@ -118,8 +125,10 @@ async def pool_status() -> dict[str, Any]:
                 "jobs_used_today": used,
                 "daily_jobs_limit": limit if limit else None,
                 "available_by_quota": (not limit or used < limit),
+                "rotation_state": states.get(worker["name"], "invalid"),
+                "accepting_new_jobs": states.get(worker["name"]) == "active" and online and (not limit or used < limit),
             })
-    return {"configured": len(workers), "workers": status}
+    return {"configured": len(workers), "active_scheduled": len(active), "warming": len(warming), "workers": status}
 
 
 async def dispatch_faceswap(source: bytes, target: bytes) -> tuple[bytes, str]:
@@ -127,12 +136,22 @@ async def dispatch_faceswap(source: bytes, target: bytes) -> tuple[bytes, str]:
     workers = _workers()
     if not workers:
         raise RuntimeError("No remote workers are configured")
+    active, warming, sleeping, invalid = scheduled_workers(workers)
     async with _dispatch_slots:
         async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT) as client:
+            # Probe upcoming workers during warm-up; they receive no jobs until active.
+            for candidate in warming:
+                candidate_headers = {"Authorization": f"Bearer {candidate['api_key']}"} if candidate["api_key"] else {}
+                try:
+                    await client.get(candidate["url"] + "/health", headers=candidate_headers, timeout=8.0)
+                except Exception:
+                    pass
+            if not active:
+                raise RuntimeError("No workers are inside an active rotation window")
             async with _selection_lock:
-                start = _cursor % len(workers)
-                _cursor = (_cursor + 1) % len(workers)
-            ordered = workers[start:] + workers[:start]
+                start = _cursor % len(active)
+                _cursor = (_cursor + 1) % len(active)
+            ordered = active[start:] + active[:start]
             attempted = 0
             errors = []
             for worker in ordered:

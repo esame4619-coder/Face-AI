@@ -131,3 +131,31 @@ def test_pool_status_reports_health_coverage_and_transition(monkeypatch, tmp_pat
     assert result["workers"][0]["health_state"] == "healthy"
     assert result["workers"][0]["accepting_new_jobs"] is True
     assert result["next_transition"] is None
+
+
+def test_pool_status_coverage_requires_quota_ready_worker(monkeypatch, tmp_path):
+    import asyncio
+
+    monkeypatch.setenv("POOL_DB_PATH", str(tmp_path / "quota-status.sqlite3"))
+    monkeypatch.setenv("WORKERS_JSON", json.dumps([
+        {"name": "worker-a", "url": "https://worker-a.example", "daily_jobs": 1}
+    ]))
+    monkeypatch.setenv("MIN_ACTIVE_WORKERS", "1")
+    monkeypatch.setattr(worker_pool, "_used_today", lambda _name: 1)
+
+    class Response:
+        is_success = True
+        def json(self): return {"status": "online"}
+
+    class Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return False
+        async def get(self, url, **kwargs): return Response()
+
+    monkeypatch.setattr(worker_pool.httpx, "AsyncClient", lambda **kwargs: Client())
+    result = asyncio.run(worker_pool.pool_status())
+
+    assert result["healthy_active"] == 1
+    assert result["ready_active"] == 0
+    assert result["coverage_gap"] is True
+    assert result["workers"][0]["available_by_quota"] is False

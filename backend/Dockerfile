@@ -14,7 +14,9 @@ RUN git clone --depth 1 --branch 3.9.2 \
     https://github.com/facefusion/facefusion.git /opt/facefusion
 
 WORKDIR /opt/facefusion
-RUN python install.py default --skip-conda
+RUN python install.py default --skip-conda \
+    && python -m pip install --no-cache-dir opencv-python-headless==5.0.0.93 \
+    && python -c "import cv2; print('OpenCV', cv2.__version__)"
 
 WORKDIR /app
 COPY requirements.txt .

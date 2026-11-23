@@ -1,0 +1,32 @@
+name: Deployment Config Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docker-compose.yml"
+      - ".env.example"
+      - ".gitignore"
+      - "backend/worker_pool.py"
+      - ".github/workflows/deployment-config.yml"
+  pull_request:
+    paths:
+      - "docker-compose.yml"
+      - ".env.example"
+      - ".gitignore"
+      - "backend/worker_pool.py"
+      - ".github/workflows/deployment-config.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Docker Compose configuration
+        run: |
+          cp .env.example .env
+          docker compose config --quiet

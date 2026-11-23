@@ -970,6 +970,8 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController apiKeyController = TextEditingController();
   bool isLoading = true;
   bool isTesting = false;
+  bool isLoadingPool = false;
+  Map<String, dynamic>? poolStatus;
   @override
   void initState() { super.initState(); loadSettings(); }
   Future<void> loadSettings() async {
@@ -1029,6 +1031,32 @@ class _SettingsPageState extends State<SettingsPage> {
       if (mounted) setState(() => isTesting = false);
     }
   }
+  Future<void> refreshPoolStatus() async {
+    final value = normalizedUrl();
+    final uri = Uri.tryParse('$value/pool/status');
+    if (value.isEmpty || uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('احفظ رابط المدير أولاً.')));
+      return;
+    }
+    setState(() => isLoadingPool = true);
+    try {
+      final key = apiKeyController.text.trim();
+      final headers = key.isEmpty ? <String, String>{} : <String, String>{'Authorization': 'Bearer $key'};
+      final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 20));
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        setState(() => poolStatus = data);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر قراءة حالة السيرفرات: ${response.statusCode}')));
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر قراءة مجموعة السيرفرات: $error')));
+    } finally {
+      if (mounted) setState(() => isLoadingPool = false);
+    }
+  }
   @override
   void dispose() { controller.dispose(); apiKeyController.dispose(); super.dispose(); }
   @override
@@ -1055,6 +1083,22 @@ class _SettingsPageState extends State<SettingsPage> {
                 SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: saveSettings, icon: const Icon(Icons.save), label: const Text('حفظ الإعدادات'))),
                 const SizedBox(height: 8),
                 SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: isTesting ? null : testConnection, icon: isTesting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.wifi_tethering), label: const Text('اختبار الاتصال بالخادم'))),
+                const SizedBox(height: 8),
+                SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: isLoadingPool ? null : refreshPoolStatus, icon: isLoadingPool ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.hub_outlined), label: const Text('عرض حالة مجموعة السيرفرات'))),
+                if (poolStatus != null) ...[
+                  const SizedBox(height: 12),
+                  Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('السيرفرات المسجلة: ${poolStatus!['configured'] ?? 0}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    ...((poolStatus!['workers'] as List<dynamic>? ?? []).map((item) {
+                      final worker = item as Map<String, dynamic>;
+                      final online = worker['online'] == true;
+                      final quota = worker['daily_jobs_limit'];
+                      final used = worker['jobs_used_today'] ?? 0;
+                      return ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: Icon(online ? Icons.check_circle : Icons.error, color: online ? Colors.green : Colors.red), title: Text('${worker['name'] ?? 'Worker'}'), subtitle: Text(online ? 'متصل • استُخدم اليوم $used${quota == null ? '' : ' من $quota'}' : 'غير متصل'));
+                    })),
+                  ]))),
+                ],
                 const SizedBox(height: 24),
                 const Divider(),
                 const ListTile(leading: Icon(Icons.info_outline), title: Text('عن التطبيق'), subtitle: Text('المحترف في AI')),

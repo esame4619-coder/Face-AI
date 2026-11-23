@@ -225,3 +225,52 @@ async def dispatch_faceswap(source: bytes, target: bytes) -> tuple[bytes, str]:
                     errors.append(f"{worker['name']}: {type(exc).__name__}")
             detail = "; ".join(errors[-3:]) or "All configured workers reached their daily quota"
             raise RuntimeError("No worker could process this request. " + detail)
+
+
+async def dispatch_video_faceswap(source: bytes, target_video: bytes) -> tuple[bytes, str]:
+    """Dispatch one video face-swap job through the same quota and rotation pool."""
+    global _cursor
+    workers = _workers()
+    if not workers:
+        raise RuntimeError("No remote workers are configured")
+    active, warming, sleeping, invalid = scheduled_workers(workers)
+    async with _dispatch_slots:
+        async with httpx.AsyncClient(timeout=3600.0) as client:
+            for candidate in warming:
+                headers = {"Authorization": f"Bearer {candidate['api_key']}"} if candidate["api_key"] else {}
+                try:
+                    await client.get(candidate["url"] + "/health", headers=headers, timeout=8.0)
+                except Exception:
+                    pass
+            if not active:
+                raise RuntimeError("No workers are inside an active rotation window")
+            async with _selection_lock:
+                start = _cursor % len(active)
+                _cursor = (_cursor + 1) % len(active)
+            ordered = active[start:] + active[:start]
+            errors = []
+            for worker in ordered[:_MAX_FAILOVER]:
+                headers = {"Authorization": f"Bearer {worker['api_key']}"} if worker["api_key"] else {}
+                try:
+                    health = await client.get(worker["url"] + "/health", headers=headers, timeout=8.0)
+                    if not health.is_success or health.json().get("status") != "online":
+                        errors.append(f"{worker['name']}: unhealthy")
+                        continue
+                    reserved = await asyncio.to_thread(_try_reserve_job, worker["name"], worker["daily_jobs"])
+                    if not reserved:
+                        errors.append(f"{worker['name']}: daily quota reached")
+                        continue
+                    response = await client.post(
+                        worker["url"] + "/api/faceswap-video",
+                        files={
+                            "source": ("source.png", source, "image/png"),
+                            "target_video": ("target.mp4", target_video, "video/mp4"),
+                        },
+                        headers=headers,
+                    )
+                    if response.is_success and response.content:
+                        return response.content, worker["name"]
+                    errors.append(f"{worker['name']}: HTTP {response.status_code}")
+                except Exception as exc:
+                    errors.append(f"{worker['name']}: {type(exc).__name__}")
+            raise RuntimeError("No worker could process this video. " + "; ".join(errors[-3:]))

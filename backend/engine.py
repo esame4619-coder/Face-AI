@@ -44,7 +44,7 @@ class FaceSwapEngine:
                 command,
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=900,
                 cwd=str(self.facefusion_path.parent),
                 check=False,
             )

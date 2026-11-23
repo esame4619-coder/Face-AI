@@ -58,6 +58,17 @@ jobs:
                   '<application android:usesCleartextTraffic="true"',
                   1,
               )
+          import re
+          content = re.sub(
+              r'<application\\b([^>]*)>',
+              lambda match: '<application' + re.sub(
+                  r'\\s+android:label="[^"]*"',
+                  '',
+                  match.group(1),
+              ) + ' android:label="المحترف في AI">',
+              content,
+              count=1,
+          )
           manifest.write_text(content)
           PY
 

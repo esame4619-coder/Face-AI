@@ -6,7 +6,7 @@ from io import BytesIO
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 from engine import face_swap_engine
 
@@ -61,6 +61,47 @@ async def validate_image(file: UploadFile):
         raise HTTPException(400, "Cannot read image")
 
     return data
+
+
+@app.post("/api/enhance")
+async def enhance_image(image: UploadFile = File(...)):
+    """Basic local enhancement: orientation correction, gentle contrast/color,
+    sharpening and 2x Lanczos enlargement. This is not an AI super-resolution model.
+    """
+    data = await validate_image(image)
+    try:
+        with Image.open(BytesIO(data)) as opened:
+            processed = ImageOps.exif_transpose(opened).convert("RGB")
+
+        width, height = processed.size
+        if width < 1 or height < 1 or width * height > 25_000_000:
+            raise HTTPException(413, "Image dimensions are too large")
+
+        processed = ImageEnhance.Contrast(processed).enhance(1.08)
+        processed = ImageEnhance.Color(processed).enhance(1.06)
+        processed = ImageEnhance.Sharpness(processed).enhance(1.25)
+        processed = processed.filter(
+            ImageFilter.UnsharpMask(radius=1.4, percent=115, threshold=3)
+        )
+
+        scale = min(2.0, 4096 / max(width, height))
+        if scale > 1:
+            processed = processed.resize(
+                (max(1, int(width * scale)), max(1, int(height * scale))),
+                Image.Resampling.LANCZOS,
+            )
+
+        output = BytesIO()
+        processed.save(output, format="PNG", optimize=True)
+        return Response(
+            content=output.getvalue(),
+            media_type="image/png",
+            headers={"Content-Disposition": "attachment; filename=enhanced.png"},
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "Could not enhance this image")
 
 
 @app.post("/api/faceswap")

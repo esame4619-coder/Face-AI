@@ -1,0 +1,70 @@
+services:
+  manager:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.manager
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      API_KEY: ${MANAGER_API_KEY:?Set MANAGER_API_KEY in .env}
+      POOL_DB_PATH: /data/worker_pool.sqlite3
+      ALLOW_INSECURE_WORKER_URLS: "true"
+      WORKERS_JSON: >-
+        [{"name":"worker-1","url":"http://worker-1:8000","api_key":"${WORKER_1_API_KEY:?Set WORKER_1_API_KEY in .env}","daily_jobs":0},{"name":"worker-2","url":"http://worker-2:8000","api_key":"${WORKER_2_API_KEY:?Set WORKER_2_API_KEY in .env}","daily_jobs":0}]
+    volumes:
+      - manager_data:/data
+    depends_on:
+      worker-1:
+        condition: service_healthy
+      worker-2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+
+  worker-1:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "8000"
+      API_KEY: ${WORKER_1_API_KEY:?Set WORKER_1_API_KEY in .env}
+    volumes:
+      - worker_1_models:/opt/facefusion/.assets
+    mem_limit: 9g
+    cpus: 1.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 45s
+      timeout: 10s
+      retries: 5
+      start_period: 15m
+
+  worker-2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "8000"
+      API_KEY: ${WORKER_2_API_KEY:?Set WORKER_2_API_KEY in .env}
+    volumes:
+      - worker_2_models:/opt/facefusion/.assets
+    mem_limit: 9g
+    cpus: 1.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 45s
+      timeout: 10s
+      retries: 5
+      start_period: 15m
+
+volumes:
+  manager_data:
+  worker_1_models:
+  worker_2_models:

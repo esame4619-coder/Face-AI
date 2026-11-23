@@ -86,3 +86,16 @@ def test_dispatch_fails_over_to_next_healthy_worker(monkeypatch, tmp_path):
     ]
     assert worker_pool._used_today("worker-a") == 1
     assert worker_pool._used_today("worker-b") == 1
+
+
+def test_private_docker_worker_urls_require_explicit_opt_in(monkeypatch):
+    monkeypatch.setenv("WORKERS_JSON", json.dumps([
+        {"name": "internal", "url": "http://worker-one:8000"},
+        {"name": "public-http", "url": "http://example.com"},
+    ]))
+    monkeypatch.delenv("ALLOW_INSECURE_WORKER_URLS", raising=False)
+    assert worker_pool._workers() == []
+
+    monkeypatch.setenv("ALLOW_INSECURE_WORKER_URLS", "true")
+    workers = worker_pool._workers()
+    assert [worker["name"] for worker in workers] == ["internal"]

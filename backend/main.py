@@ -2,6 +2,7 @@ import asyncio
 import os
 import secrets
 import tempfile
+import subprocess
 from pathlib import Path
 from io import BytesIO
 
@@ -11,7 +12,7 @@ from fastapi.responses import Response
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 from engine import face_swap_engine
-from worker_pool import dispatch_faceswap, pool_status
+from worker_pool import dispatch_faceswap, dispatch_video_faceswap, pool_status
 
 
 app = FastAPI(
@@ -171,3 +172,85 @@ async def face_swap(
         raise
     except Exception as error:
         raise HTTPException(503, "Face swap is temporarily unavailable")
+
+
+MAX_VIDEO_SIZE = 200 * 1024 * 1024
+MAX_VIDEO_DURATION = 120.0
+
+
+def inspect_video(data: bytes) -> float:
+    """Validate MP4 container and enforce the agreed 1–120 second duration."""
+    with tempfile.NamedTemporaryFile(suffix=".mp4") as temp:
+        temp.write(data)
+        temp.flush()
+        try:
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration,format_name",
+                 "-of", "default=noprint_wrappers=1", temp.name],
+                capture_output=True, text=True, timeout=20, check=True,
+            )
+            values = dict(
+                line.split("=", 1) for line in probe.stdout.splitlines() if "=" in line
+            )
+            duration = float(values.get("duration", "0"))
+            formats = values.get("format_name", "")
+            if "mp4" not in formats and "mov" not in formats:
+                raise ValueError("not an MP4 container")
+            if duration < 1.0 or duration > MAX_VIDEO_DURATION:
+                raise ValueError("duration outside allowed range")
+            return duration
+        except (subprocess.SubprocessError, ValueError, OSError):
+            raise HTTPException(400, "الفيديو لازم يكون MP4 ومدته من ثانية إلى 120 ثانية.") from None
+
+
+@app.post("/api/faceswap-video")
+async def face_swap_video(
+    source: UploadFile = File(...),
+    target_video: UploadFile = File(...),
+    _auth: None = Depends(verify_api_key),
+):
+    """Swap a source face into an MP4 video using the installed FaceFusion engine."""
+    if source.content_type and not source.content_type.startswith("image/"):
+        raise HTTPException(400, "ملف الوجه الأصلي لازم يكون صورة.")
+    if target_video.content_type not in {"video/mp4", "application/mp4", "video/quicktime"}:
+        raise HTTPException(400, "صيغة الفيديو المدعومة هي MP4 فقط.")
+
+    source_data = await validate_image(source)
+    video_data = await target_video.read(MAX_VIDEO_SIZE + 1)
+    if not video_data:
+        raise HTTPException(400, "ملف الفيديو فارغ.")
+    if len(video_data) > MAX_VIDEO_SIZE:
+        raise HTTPException(413, "الحد الأقصى لحجم الفيديو 200 ميجابايت.")
+    inspect_video(video_data)
+
+    try:
+        if os.getenv("WORKERS_JSON", "").strip():
+            result, worker_name = await dispatch_video_faceswap(source_data, video_data)
+        else:
+            if not face_swap_engine.is_available():
+                raise HTTPException(503, "محرك FaceFusion غير مثبت ولا توجد سيرفرات معالجة مرتبطة.")
+            with tempfile.TemporaryDirectory() as temp_dir:
+                output_path = Path(temp_dir) / "faceswap_video.mp4"
+                await asyncio.to_thread(
+                    face_swap_engine.swap_video,
+                    source_data,
+                    video_data,
+                    str(output_path),
+                )
+                if not output_path.is_file():
+                    raise RuntimeError("Video output was not generated")
+                result = output_path.read_bytes()
+            worker_name = "local"
+
+        return Response(
+            content=result,
+            media_type="video/mp4",
+            headers={
+                "Content-Disposition": 'attachment; filename="faceswap.mp4"',
+                "X-Worker-Name": worker_name,
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(503, "تعذرت معالجة الفيديو حاليًا. تأكد من جاهزية محرك FaceFusion والسيرفر.")

@@ -6,10 +6,12 @@ never creates accounts, bypasses provider limits, or assumes free capacity.
 import asyncio
 import json
 import os
+import re
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -35,7 +37,16 @@ def _workers() -> list[dict[str, Any]]:
         if not isinstance(item, dict) or not item.get("url") or not item.get("name"):
             continue
         url = str(item["url"]).strip().rstrip("/")
-        if not url.startswith("https://") and not url.startswith("http://127.0.0.1"):
+        parsed = urlparse(url)
+        secure_url = parsed.scheme == "https" and bool(parsed.hostname)
+        loopback_url = parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost"}
+        internal_http = (
+            os.getenv("ALLOW_INSECURE_WORKER_URLS", "").lower() == "true"
+            and parsed.scheme == "http"
+            and bool(parsed.hostname)
+            and re.fullmatch(r"[a-zA-Z0-9-]+", parsed.hostname) is not None
+        )
+        if not (secure_url or loopback_url or internal_http):
             continue
         result.append({
             "name": str(item["name"]),

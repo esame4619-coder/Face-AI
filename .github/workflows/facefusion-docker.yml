@@ -36,3 +36,28 @@ jobs:
         run: |
           docker run --rm --entrypoint python mohtarif-face-ai:ci /opt/facefusion/facefusion.py --help
           docker run --rm --entrypoint python mohtarif-face-ai:ci /opt/facefusion/facefusion.py headless-run --help
+
+      - name: Run real CPU face-swap inference
+        timeout-minutes: 25
+        run: |
+          set -euxo pipefail
+          mkdir -p "$RUNNER_TEMP/facefusion-test"
+          curl -fL --retry 3 \
+            https://raw.githubusercontent.com/opencv/opencv/master/samples/data/lena.jpg \
+            -o "$RUNNER_TEMP/facefusion-test/source.jpg"
+          cp "$RUNNER_TEMP/facefusion-test/source.jpg" "$RUNNER_TEMP/facefusion-test/target.jpg"
+          docker run --rm \
+            -v "$RUNNER_TEMP/facefusion-test:/test-data" \
+            --entrypoint python \
+            mohtarif-face-ai:ci \
+            /opt/facefusion/facefusion.py headless-run \
+              --source-paths /test-data/source.jpg \
+              --target-path /test-data/target.jpg \
+              --output-path /test-data/swapped.png \
+              --processors face_swapper
+          test -s "$RUNNER_TEMP/facefusion-test/swapped.png"
+          docker run --rm \
+            -v "$RUNNER_TEMP/facefusion-test:/test-data" \
+            --entrypoint python \
+            mohtarif-face-ai:ci \
+            -c "from PIL import Image; im=Image.open('/test-data/swapped.png'); im.verify(); print('REAL INFERENCE OUTPUT:', im.format, im.size)"

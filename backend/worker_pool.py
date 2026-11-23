@@ -66,18 +66,26 @@ def _used_today(name: str) -> int:
         return int(row[0]) if row else 0
 
 
-def _reserve_job(name: str) -> None:
+def _try_reserve_job(name: str, daily_limit: int) -> bool:
     today = datetime.now(timezone.utc).date().isoformat()
-    with sqlite3.connect(_db_path(), timeout=10) as db:
+    with sqlite3.connect(_db_path(), timeout=10, isolation_level="IMMEDIATE") as db:
         db.execute("""CREATE TABLE IF NOT EXISTS worker_usage (
             worker TEXT NOT NULL, day TEXT NOT NULL, jobs INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY(worker, day)
         )""")
+        row = db.execute(
+            "SELECT jobs FROM worker_usage WHERE worker=? AND day=?",
+            (name, today),
+        ).fetchone()
+        used = int(row[0]) if row else 0
+        if daily_limit and used >= daily_limit:
+            return False
         db.execute(
             """INSERT INTO worker_usage(worker, day, jobs) VALUES(?, ?, 1)
             ON CONFLICT(worker, day) DO UPDATE SET jobs=jobs+1""",
             (name, today),
         )
+        return True
 
 
 async def pool_status() -> dict[str, Any]:
@@ -120,17 +128,18 @@ async def dispatch_faceswap(source: bytes, target: bytes) -> tuple[bytes, str]:
                 if attempted >= min(_MAX_FAILOVER, len(ordered)):
                     break
                 attempted += 1
-                used = await asyncio.to_thread(_used_today, worker["name"])
-                limit = worker["daily_jobs"]
-                if limit and used >= limit:
-                    continue
                 headers = {"Authorization": f"Bearer {worker['api_key']}"} if worker["api_key"] else {}
                 try:
                     health = await client.get(worker["url"] + "/health", headers=headers, timeout=8.0)
                     if not health.is_success or health.json().get("status") != "online":
                         errors.append(f"{worker['name']}: unhealthy")
                         continue
-                    _reserve_job(worker["name"])
+                    reserved = await asyncio.to_thread(
+                        _try_reserve_job, worker["name"], worker["daily_jobs"]
+                    )
+                    if not reserved:
+                        errors.append(f"{worker['name']}: daily quota reached")
+                        continue
                     response = await client.post(
                         worker["url"] + "/api/faceswap",
                         files={

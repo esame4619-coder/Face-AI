@@ -81,11 +81,15 @@ def _used_today(name: str) -> int:
 
 def _try_reserve_job(name: str, daily_limit: int) -> bool:
     today = datetime.now(timezone.utc).date().isoformat()
-    with sqlite3.connect(_db_path(), timeout=10, isolation_level="IMMEDIATE") as db:
+    with sqlite3.connect(_db_path(), timeout=30, isolation_level=None) as db:
         db.execute("""CREATE TABLE IF NOT EXISTS worker_usage (
             worker TEXT NOT NULL, day TEXT NOT NULL, jobs INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY(worker, day)
         )""")
+        # Acquire the write lock before reading the current count. Starting the
+        # transaction only at the later INSERT allows concurrent callers to read
+        # the same stale count and over-reserve the daily quota.
+        db.execute("BEGIN IMMEDIATE")
         row = db.execute(
             "SELECT jobs FROM worker_usage WHERE worker=? AND day=?",
             (name, today),

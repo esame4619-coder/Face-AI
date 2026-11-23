@@ -54,3 +54,20 @@ def scheduled_workers(workers: list[dict], now: datetime | None = None):
         else:
             invalid.append(worker["name"])
     return active, warming, sleeping, invalid
+
+
+def next_rotation_transition(workers: list[dict], now: datetime | None = None):
+    """Find the next minute when any configured worker changes schedule state."""
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    current = current.astimezone(timezone.utc).replace(second=0, microsecond=0)
+    initial = [rotation_state(w.get("rotation", {}), current) for w in workers]
+    if all(not w.get("rotation", {}).get("enabled", False) for w in workers):
+        return None
+    for minute in range(1, 24 * 60 + 1):
+        candidate = current + timedelta(minutes=minute)
+        states = [rotation_state(w.get("rotation", {}), candidate) for w in workers]
+        if states != initial:
+            return candidate.isoformat()
+    return None

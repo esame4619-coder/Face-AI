@@ -27,8 +27,9 @@ def test_worker_config_empty_means_no_remote_workers(monkeypatch):
 def test_worker_usage_is_counted_per_utc_day_and_worker(tmp_path, monkeypatch):
     monkeypatch.setenv("POOL_DB_PATH", str(tmp_path / "usage.sqlite3"))
     assert worker_pool._used_today("worker-a") == 0
-    worker_pool._reserve_job("worker-a")
-    worker_pool._reserve_job("worker-a")
-    worker_pool._reserve_job("worker-b")
+    assert worker_pool._try_reserve_job("worker-a", 2) is True
+    assert worker_pool._try_reserve_job("worker-a", 2) is True
+    assert worker_pool._try_reserve_job("worker-a", 2) is False
+    assert worker_pool._try_reserve_job("worker-b", 2) is True
     assert worker_pool._used_today("worker-a") == 2
     assert worker_pool._used_today("worker-b") == 1

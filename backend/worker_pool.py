@@ -96,12 +96,14 @@ def _try_reserve_job(name: str, daily_limit: int) -> bool:
         ).fetchone()
         used = int(row[0]) if row else 0
         if daily_limit and used >= daily_limit:
+            db.execute("COMMIT")
             return False
         db.execute(
             """INSERT INTO worker_usage(worker, day, jobs) VALUES(?, ?, 1)
             ON CONFLICT(worker, day) DO UPDATE SET jobs=jobs+1""",
             (name, today),
         )
+        db.execute("COMMIT")
         return True
 
 

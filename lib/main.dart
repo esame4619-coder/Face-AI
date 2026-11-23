@@ -736,8 +736,228 @@ class _SettingsPageState extends State<SettingsPage> {
     if (mounted) setState(() => isLoading = false);
   }
 
+  Future<void> testConnection() async {
+    final baseUrl = controller.text.trim().replaceAll(RegExp(r'/+
+    if (value.isNotEmpty) {
+      final uri = Uri.tryParse(value);
+      if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('اكتب عنواناً صحيحاً يبدأ بـ http:// أو https://')),
+        );
+        return;
+      }
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('backend_url', value);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم حفظ عنوان خادم المعالجة.')),
+    );
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('الإعدادات')),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                const ListTile(
+                  leading: Icon(Icons.person_outline),
+                  title: Text('المستخدم الشخصي'),
+                  subtitle: Text('تطبيقك الخاص'),
+                ),
+                const Divider(),
+                const ListTile(
+                  leading: Icon(Icons.language),
+                  title: Text('اللغة'),
+                  subtitle: Text('العربية'),
+                ),
+                const Divider(),
+                const Text(
+                  'خادم المعالجة المجاني',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'اكتب عنوان جهازك الذي يشغّل Backend المحترف في AI. '
+                  'مثال: http://192.168.1.5:8000 — لا تكتب localhost عند استخدام الهاتف.',
+                  style: TextStyle(color: Colors.white60),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.url,
+                  textDirection: TextDirection.ltr,
+                  decoration: const InputDecoration(
+                    hintText: 'http://192.168.1.5:8000',
+                    border: OutlineInputBorder(),
+                    labelText: 'عنوان خادم المعالجة',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: saveSettings,
+                    icon: const Icon(Icons.save),
+                    label: const Text('حفظ الإعدادات'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: testConnection,
+                    icon: const Icon(Icons.wifi_tethering),
+                    label: const Text('اختبار الاتصال بالخادم'),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Divider(),
+                const ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('عن التطبيق'),
+                  subtitle: Text('المحترف في AI'),
+                ),
+              ],
+            ),
+    );
+  }
+}
+), '');
+    final uri = Uri.tryParse('$baseUrl/health');
+    if (baseUrl.isEmpty || uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اكتب عنوان خادم صحيح أولاً.')),
+      );
+      return;
+    }
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final available = data['engine_available'] == true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              available
+                  ? 'الاتصال ناجح ومحرك FaceFusion متاح.'
+                  : 'الاتصال ناجح، لكن محرك FaceFusion غير مثبت على الخادم بعد.',
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('الخادم رد برمز ${response.statusCode}.')),
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر الاتصال بالخادم: $error')),
+      );
+    }
+  }
+
   Future<void> saveSettings() async {
-    final value = controller.text.trim().replaceAll(RegExp(r'/+$'), '');
+    final value = controller.text.trim().replaceAll(RegExp(r'/+
+    if (value.isNotEmpty) {
+      final uri = Uri.tryParse(value);
+      if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('اكتب عنواناً صحيحاً يبدأ بـ http:// أو https://')),
+        );
+        return;
+      }
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('backend_url', value);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم حفظ عنوان خادم المعالجة.')),
+    );
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('الإعدادات')),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                const ListTile(
+                  leading: Icon(Icons.person_outline),
+                  title: Text('المستخدم الشخصي'),
+                  subtitle: Text('تطبيقك الخاص'),
+                ),
+                const Divider(),
+                const ListTile(
+                  leading: Icon(Icons.language),
+                  title: Text('اللغة'),
+                  subtitle: Text('العربية'),
+                ),
+                const Divider(),
+                const Text(
+                  'خادم المعالجة المجاني',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'اكتب عنوان جهازك الذي يشغّل Backend المحترف في AI. '
+                  'مثال: http://192.168.1.5:8000 — لا تكتب localhost عند استخدام الهاتف.',
+                  style: TextStyle(color: Colors.white60),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.url,
+                  textDirection: TextDirection.ltr,
+                  decoration: const InputDecoration(
+                    hintText: 'http://192.168.1.5:8000',
+                    border: OutlineInputBorder(),
+                    labelText: 'عنوان خادم المعالجة',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: saveSettings,
+                    icon: const Icon(Icons.save),
+                    label: const Text('حفظ الإعدادات'),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Divider(),
+                const ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('عن التطبيق'),
+                  subtitle: Text('المحترف في AI'),
+                ),
+              ],
+            ),
+    );
+  }
+}
+), '');
     if (value.isNotEmpty) {
       final uri = Uri.tryParse(value);
       if (uri == null || !uri.hasScheme || uri.host.isEmpty) {

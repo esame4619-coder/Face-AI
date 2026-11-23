@@ -12,6 +12,7 @@ from starlette.datastructures import Headers, UploadFile
 import pytest
 
 import main
+from worker_pool import _try_reserve_job, _used_today
 
 
 client = TestClient(main.app)
@@ -122,3 +123,11 @@ def test_pool_status_accepts_correct_api_key_when_configured(monkeypatch):
     )
     assert response.status_code == 200
     assert response.json() == {"workers": []}
+
+
+def test_worker_quota_reservation_is_persisted(tmp_path, monkeypatch):
+    monkeypatch.setenv("POOL_DB_PATH", str(tmp_path / "usage.sqlite3"))
+    assert _try_reserve_job("worker-a", 1) is True
+    assert _used_today("worker-a") == 1
+    assert _try_reserve_job("worker-a", 1) is False
+    assert _used_today("worker-a") == 1

@@ -1,5 +1,5 @@
 # Optional self-hosted CPU backend. It uses open-source software and no paid API.
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

@@ -898,7 +898,8 @@ class _MyWorksPageState extends State<MyWorksPage> {
           .where((file) {
             final name = file.uri.pathSegments.last;
             return name.startsWith('faceswap_') ||
-                name.startsWith('enhanced_');
+                name.startsWith('enhanced_') ||
+                name.startsWith('faceswap_video_');
           })
           .toList()
         ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
@@ -916,6 +917,7 @@ class _MyWorksPageState extends State<MyWorksPage> {
 
   String titleFor(File file) {
     final name = file.uri.pathSegments.last;
+    if (name.startsWith('faceswap_video_')) return 'فيديو بعد تبديل الوجه';
     return name.startsWith('faceswap_') ? 'نتيجة تبديل وجه' : 'صورة محسّنة';
   }
 
@@ -954,9 +956,9 @@ class _MyWorksPageState extends State<MyWorksPage> {
               Text(titleFor(file), style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Flexible(
-                child: InteractiveViewer(
-                  child: Image.file(file, fit: BoxFit.contain),
-                ),
+                child: file.path.endsWith('.mp4')
+                    ? _SavedVideoPreview(file: file)
+                    : InteractiveViewer(child: Image.file(file, fit: BoxFit.contain)),
               ),
               const SizedBox(height: 8),
               TextButton(
@@ -1049,6 +1051,36 @@ class _MyWorksPageState extends State<MyWorksPage> {
                   ),
                 ),
     );
+  }
+}
+
+
+class _SavedVideoPreview extends StatefulWidget {
+  final File file;
+  const _SavedVideoPreview({required this.file});
+  @override
+  State<_SavedVideoPreview> createState() => _SavedVideoPreviewState();
+}
+class _SavedVideoPreviewState extends State<_SavedVideoPreview> {
+  late final VideoPlayerController controller;
+  @override
+  void initState() {
+    super.initState();
+    controller = VideoPlayerController.file(widget.file)
+      ..initialize().then((_) { if (mounted) setState(() {}); });
+  }
+  @override
+  void dispose() { controller.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    if (!controller.value.isInitialized) return const Center(child: CircularProgressIndicator());
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      AspectRatio(aspectRatio: controller.value.aspectRatio, child: VideoPlayer(controller)),
+      IconButton(
+        onPressed: () => setState(() => controller.value.isPlaying ? controller.pause() : controller.play()),
+        icon: Icon(controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle, size: 42),
+      ),
+    ]);
   }
 }
 

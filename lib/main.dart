@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -294,9 +295,7 @@ class HomePage extends StatelessWidget {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => const ComingSoonPage(
-            title: 'استوديو الفيديو',
-          ),
+          builder: (_) => const VideoFaceSwapStudio(),
         ),
       );
     } else {
@@ -535,6 +534,102 @@ class _FaceSwapStudioState extends State<FaceSwapStudio> {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class VideoFaceSwapStudio extends StatefulWidget {
+  const VideoFaceSwapStudio({super.key});
+  @override
+  State<VideoFaceSwapStudio> createState() => _VideoFaceSwapStudioState();
+}
+class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
+  final ImagePicker picker = ImagePicker();
+  File? sourceFace, targetVideo, resultVideo;
+  VideoPlayerController? player;
+  bool processing = false;
+
+  Future<void> chooseFace() async {
+    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 100);
+    if (file != null && mounted) setState(() => sourceFace = File(file.path));
+  }
+  Future<void> chooseVideo() async {
+    final file = await picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(seconds: 120));
+    if (file == null) return;
+    final selected = File(file.path);
+    if (await selected.length() > 200 * 1024 * 1024) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حجم الفيديو أكبر من 200 ميجابايت.')));
+      return;
+    }
+    if (mounted) setState(() => targetVideo = selected);
+  }
+  Future<void> processVideo() async {
+    if (sourceFace == null || targetVideo == null || processing) return;
+    setState(() => processing = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var base = (prefs.getString('backend_url') ?? '').trim();
+      while (base.endsWith('/')) { base = base.substring(0, base.length - 1); }
+      if (base.isEmpty) throw Exception('احفظ رابط خادم المعالجة من الإعدادات أولاً.');
+      final key = (prefs.getString('backend_api_key') ?? '').trim();
+      final request = http.MultipartRequest('POST', Uri.parse('$base/api/faceswap-video'));
+      if (key.isNotEmpty) request.headers['Authorization'] = 'Bearer $key';
+      request.files.add(await http.MultipartFile.fromPath('source', sourceFace!.path));
+      request.files.add(await http.MultipartFile.fromPath('target_video', targetVideo!.path));
+      final streamed = await request.send().timeout(const Duration(minutes: 65));
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode != 200 || !response.headers['content-type'].toString().contains('video/')) {
+        var detail = 'الخادم رد برمز ${response.statusCode}.';
+        try { final body = jsonDecode(response.body); if (body is Map && body['detail'] != null) detail = body['detail'].toString(); } catch (_) {}
+        throw Exception(detail);
+      }
+      final dir = await getApplicationDocumentsDirectory();
+      final output = File('${dir.path}/faceswap_video_${DateTime.now().millisecondsSinceEpoch}.mp4');
+      await output.writeAsBytes(response.bodyBytes, flush: true);
+      await player?.dispose();
+      player = VideoPlayerController.file(output);
+      await player!.initialize();
+      if (!mounted) return;
+      setState(() => resultVideo = output);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تجهيز الفيديو وحفظه داخل أعمالي.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذرت معالجة الفيديو: $e')));
+    } finally { if (mounted) setState(() => processing = false); }
+  }
+  @override
+  void dispose() { player?.dispose(); super.dispose(); }
+  Widget selectionCard(String title, String subtitle, IconData icon, VoidCallback action, {String? filename}) {
+    return Card(child: ListTile(
+      leading: Icon(icon, color: const Color(0xFF9B7BFA), size: 32),
+      title: Text(title), subtitle: Text(filename ?? subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.upload_file), onTap: action,
+    ));
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('تبديل الوجوه بالفيديو')),
+      body: ListView(padding: const EdgeInsets.all(16), children: [
+        const Text('اختار صورة الوجه والفيديو اللي عايز تبدّل الوجه فيه.', style: TextStyle(fontSize: 16)),
+        const SizedBox(height: 12),
+        selectionCard('صورة الوجه الأصلي', 'اختار صورة واضحة للوجه', Icons.face, chooseFace, filename: sourceFace?.path.split('/').last),
+        selectionCard('الفيديو المستهدف', 'MP4 • من ثانية إلى 120 ثانية • حتى 200MB', Icons.video_file, chooseVideo, filename: targetVideo?.path.split('/').last),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: sourceFace != null && targetVideo != null && !processing ? processVideo : null,
+          icon: processing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome),
+          label: Text(processing ? 'جاري معالجة الفيديو...' : 'ابدأ تبديل الوجه'),
+        ),
+        if (processing) const Padding(padding: EdgeInsets.all(16), child: Text('قد تستغرق المعالجة وقتًا حسب طول الفيديو وقدرة السيرفر.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60))),
+        if (resultVideo != null && player != null) ...[
+          const SizedBox(height: 24), const Text('النتيجة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+          const SizedBox(height: 10),
+          AspectRatio(aspectRatio: player!.value.aspectRatio, child: ClipRRect(borderRadius: BorderRadius.circular(14), child: VideoPlayer(player!))),
+          VideoProgressIndicator(player!, allowScrubbing: true),
+          IconButton(onPressed: () => setState(() => player!.value.isPlaying ? player!.pause() : player!.play()), icon: Icon(player!.value.isPlaying ? Icons.pause_circle : Icons.play_circle, size: 42)),
+        ],
+      ]),
     );
   }
 }

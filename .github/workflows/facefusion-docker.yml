@@ -34,8 +34,8 @@ jobs:
 
       - name: Verify FaceFusion installation and CLI
         run: |
-          docker run --rm --entrypoint python mohtarif-face-ai:ci /opt/facefusion/facefusion.py --help
-          docker run --rm --entrypoint python mohtarif-face-ai:ci /opt/facefusion/facefusion.py headless-run --help
+          docker run --rm --workdir /opt/facefusion --entrypoint python mohtarif-face-ai:ci /opt/facefusion/facefusion.py --help
+          docker run --rm --workdir /opt/facefusion --entrypoint python mohtarif-face-ai:ci /opt/facefusion/facefusion.py headless-run --help
 
       - name: Run real CPU face-swap inference
         timeout-minutes: 25
@@ -48,6 +48,7 @@ jobs:
           cp "$RUNNER_TEMP/facefusion-test/source.jpg" "$RUNNER_TEMP/facefusion-test/target.jpg"
           docker run --rm \
             -v "$RUNNER_TEMP/facefusion-test:/test-data" \
+            --workdir /opt/facefusion \
             --entrypoint python \
             mohtarif-face-ai:ci \
             /opt/facefusion/facefusion.py headless-run \

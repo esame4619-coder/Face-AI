@@ -63,7 +63,7 @@ async def worker_pool_status(_auth: None = Depends(verify_api_key)):
     try:
         return await pool_status()
     except Exception as error:
-        raise HTTPException(503, f"Could not read worker pool status: {error}")
+        raise HTTPException(503, "Could not read worker pool status")
 
 
 async def validate_image(file: UploadFile):
@@ -170,4 +170,4 @@ async def face_swap(
     except HTTPException:
         raise
     except Exception as error:
-        raise HTTPException(503, f"Face swap unavailable: {str(error)}")
+        raise HTTPException(503, "Face swap is temporarily unavailable")

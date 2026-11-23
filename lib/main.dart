@@ -350,10 +350,18 @@ class _FaceSwapStudioState extends State<FaceSwapStudio> {
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/api/faceswap'));
       request.files.add(await http.MultipartFile.fromPath('source', sourceFace!.path));
       request.files.add(await http.MultipartFile.fromPath('target', targetImage!.path));
-      final streamed = await request.send().timeout(const Duration(minutes: 6));
+      final streamed = await request.send().timeout(const Duration(minutes: 15));
       final response = await http.Response.fromStream(streamed);
       if (response.statusCode != 200) {
-        throw Exception('الخادم رد برمز ${response.statusCode}.');
+        var detail = 'الخادم رد برمز ${response.statusCode}.';
+        try {
+          final body = jsonDecode(response.body);
+          if (body is Map && body['detail'] != null) detail = body['detail'].toString();
+        } catch (_) {}
+        throw Exception(detail);
+      }
+      if (response.bodyBytes.isEmpty || !response.headers['content-type'].toString().contains('image/')) {
+        throw Exception('الخادم لم يُرجع صورة صالحة. راجع سجل الخادم.');
       }
       final directory = await getApplicationDocumentsDirectory();
       final output = File('${directory.path}/faceswap_${DateTime.now().millisecondsSinceEpoch}.png');
@@ -1003,7 +1011,7 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر الاتصال بالخادم: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر الاتصال بالخادم. تأكد أن الرابط صحيح وأن الخادم يعمل ويمكن الوصول إليه. التفاصيل: $error')));
     } finally {
       if (mounted) setState(() => isTesting = false);
     }
@@ -1025,7 +1033,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 const Divider(),
                 const Text('خادم المعالجة المجاني', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                const Text('اكتب عنوان جهازك الذي يشغّل Backend المحترف في AI. مثال: http://192.168.1.5:8000 — لا تكتب localhost عند استخدام الهاتف.', style: TextStyle(color: Colors.white60)),
+                const Text('لا يوجد خادم منشور تلقائياً حتى الآن. هذا الحقل لا يعمل إلا بعد تشغيل خادم المحترف في AI على جهاز أو استضافته. عند استخدام الهاتف لا تكتب localhost؛ أدخل رابط الخادم الفعلي الذي يبدأ بـ https:// أو عنوان جهازك على نفس شبكة Wi‑Fi.', style: TextStyle(color: Colors.white60)),
                 const SizedBox(height: 12),
                 TextField(controller: controller, keyboardType: TextInputType.url, textDirection: TextDirection.ltr, decoration: const InputDecoration(hintText: 'http://192.168.1.5:8000', border: OutlineInputBorder(), labelText: 'عنوان خادم المعالجة')),
                 const SizedBox(height: 12),

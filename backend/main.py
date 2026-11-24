@@ -68,9 +68,9 @@ async def worker_pool_status(_auth: None = Depends(verify_api_key)):
 
 
 async def validate_image(file: UploadFile):
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(400, "Invalid image format")
-
+    # Do not trust the multipart Content-Type header: some Android gallery
+    # providers send valid photos as application/octet-stream. Validate the
+    # actual file bytes with Pillow below instead.
     data = await file.read(MAX_FILE_SIZE + 1)
 
     if len(data) > MAX_FILE_SIZE:

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import secrets
 import tempfile
@@ -31,6 +32,8 @@ app.add_middleware(
 
 MAX_FILE_SIZE = 15 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
+
+logger = logging.getLogger("mohtarif.faceswap")
 
 
 async def verify_api_key(authorization: str | None = Header(default=None)):
@@ -170,7 +173,9 @@ async def face_swap(
 
     except HTTPException:
         raise
-    except Exception as error:
+    except Exception:
+        # Keep the detailed traceback in the server log; never expose internals to the app client.
+        logger.exception("Face swap processing failed")
         raise HTTPException(503, "Face swap is temporarily unavailable")
 
 

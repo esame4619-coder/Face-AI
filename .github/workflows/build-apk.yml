@@ -113,22 +113,27 @@ jobs:
           import re
           root = Path.home() / ".pub-cache" / "hosted" / "pub.dev"
           patterns = [
-              (re.compile(r'(compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|[0-9]+)'), r'\g<1>36'),
-              (re.compile(r'(compileSdkVersion\s+)(?:flutter\.compileSdkVersion|[0-9]+)'), r'\g<1>36'),
+              re.compile(r'(compileSdk\\s*=\\s*)(?:flutter\\.compileSdkVersion|[0-9]+)'),
+              re.compile(r'(compileSdk\\s+)(?:flutter\\.compileSdkVersion|[0-9]+)'),
+              re.compile(r'(compileSdkVersion\\s*=?\\s*)(?:flutter\\.compileSdkVersion|[0-9]+)'),
           ]
           changed = []
-          for gradle in root.glob("*/android/build.gradle*"):
+          picker_files = []
+          for gradle in root.rglob("build.gradle*"):
+              if "file_picker-" in str(gradle):
+                  picker_files.append(gradle)
               content = gradle.read_text(errors="ignore")
               original = content
-              for pattern, replacement in patterns:
-                  content = pattern.sub(replacement, content)
+              for pattern in patterns:
+                  content = pattern.sub(r'\\g<1>36', content)
               if content != original:
                   gradle.write_text(content)
                   changed.append(str(gradle))
           print("Patched Android plugin Gradle files:")
           print("\\n".join(changed) if changed else "No plugin Gradle files needed changes")
+          print("file_picker Gradle files found:", [str(p) for p in picker_files])
           if not any("file_picker-" in item for item in changed):
-              print("NOTE: file_picker was not modified; inspect its resolved Gradle file if build fails.")
+              raise SystemExit("ERROR: file_picker compileSdk was not patched; refusing to continue")
           PY
 
       - name: Build APK

@@ -80,3 +80,11 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 - Backend `inspect_video` error text now accurately says MP4 or MOV, matching the content-type checks and ffprobe container validation. Commit: `5fdebce51ab827bba68c6932225401a0303b1c02`.
 - Latest Backend API Tests #79 run `45548219309` and Manager Docker Build Check #54 run `45548219238` are in progress on commit `5fdebce51ab827bba68c6932225401a0303b1c02`.
 - APK Build #108 run `45548116299` remains in progress on Flutter commit `454d1e0049eb3286a6ea202ce17950edf3c28a3b`. This build contains the UI copy update that says MP4 or MOV; poll before delivery.
+
+
+## Final status at latest work batch (2026-11-25)
+- Backend API Tests #79 (run `45548219309`) SUCCESS after correcting MOV duration error wording; Manager Docker Build Check #54 (run `45548219238`) SUCCESS.
+- Added an API-level test that submits a `video/quicktime` MOV upload to `/api/video-faces`; commit `98342a15a1ffd33ee26712ae14ea229ae4b8d348`.
+- Backend API Tests #80 run `45548349510` and Manager Docker Build Check #55 run `45548349368` are queued on that commit.
+- APK Build #108 run `45548116299` (Flutter commit `454d1e0049eb3286a6ea202ce17950edf3c28a3b`) was still in progress at the latest poll. It has not yet produced a confirmed downloadable artifact. Poll it and fetch artifact after success.
+- FaceFusion 3.9.2 source inspection reconfirmed `face_detector.pre_check()` downloads/checks detector models; `detect_faces(frame)` returns bounding boxes, scores and landmarks; `create_program()` exposes `headless-run`; and the CLI flags for detector model/size/score, selector order, reference frame and face position exist. This is static upstream-source validation only, not a successful live inference test.

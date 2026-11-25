@@ -71,3 +71,12 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 - Latest CI at checkpoint: Backend API Tests #77 run `45548122148` is in progress on commit `29a479afc285394734c4da81e427b76b175f92aa`; Manager Docker Build Check #52 run `45548122186` is in progress on same commit. APK Build #108 run `45548116299` is in progress on Flutter commit `454d1e0049eb3286a6ea202ce17950edf3c28a3b`. Poll all three before reporting final status.
 - The audio/voice screens remain UI-only and explicitly tell users no processing engine is connected yet. Do not present them as working features. Image enhancement is basic Pillow/Lanczos, not AI super-resolution.
 - Worker quota reservation is intentionally charged before processing; a worker attempt that fails after dispatch may still count. This avoids unsafe refunds when a timed-out worker may actually have completed work. If exposing usage to users, label it as attempts/processing slots rather than guaranteed successful outputs.
+
+
+## Latest test and compatibility fixes (2026-11-25)
+- Backend API Tests #77 (run `45548122148`) initially FAILED: the new MOV test fixture returned a literal backslash-n, not two ffprobe output lines. The implementation itself accepted MOV; the test fixture was corrected.
+- Backend API Tests #78 (run `45548144657`) SUCCESS: 48 passed, 1 upstream Starlette/httpx deprecation warning. The fixture now builds stdout using `chr(10).join(...)`.
+- Manager Docker Build Check #53 (run `45548144703`) SUCCESS.
+- Backend `inspect_video` error text now accurately says MP4 or MOV, matching the content-type checks and ffprobe container validation. Commit: `5fdebce51ab827bba68c6932225401a0303b1c02`.
+- Latest Backend API Tests #79 run `45548219309` and Manager Docker Build Check #54 run `45548219238` are in progress on commit `5fdebce51ab827bba68c6932225401a0303b1c02`.
+- APK Build #108 run `45548116299` remains in progress on Flutter commit `454d1e0049eb3286a6ea202ce17950edf3c28a3b`. This build contains the UI copy update that says MP4 or MOV; poll before delivery.

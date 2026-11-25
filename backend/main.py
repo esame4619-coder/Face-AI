@@ -205,7 +205,7 @@ def inspect_video(data: bytes) -> float:
                 raise ValueError("duration outside allowed range")
             return duration
         except (subprocess.SubprocessError, ValueError, OSError):
-            raise HTTPException(400, "الفيديو لازم يكون MP4 ومدته من ثانية إلى 60 ثانية.") from None
+            raise HTTPException(400, "الفيديو لازم يكون MP4 أو MOV ومدته من ثانية إلى 60 ثانية.") from None
 
 
 

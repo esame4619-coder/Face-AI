@@ -113,8 +113,8 @@ jobs:
           import re
           root = Path.home() / ".pub-cache" / "hosted" / "pub.dev"
           patterns = [
-              (re.compile(r'(compileSdk\\s*=\\s*)(?:flutter\\.compileSdkVersion|[0-9]+)'), r'\\g<1>36'),
-              (re.compile(r'(compileSdkVersion\\s+)(?:flutter\\.compileSdkVersion|[0-9]+)'), r'\\g<1>36'),
+              (re.compile(r'(compileSdk\s*=\s*)(?:flutter\.compileSdkVersion|[0-9]+)'), r'\g<1>36'),
+              (re.compile(r'(compileSdkVersion\s+)(?:flutter\.compileSdkVersion|[0-9]+)'), r'\g<1>36'),
           ]
           changed = []
           for gradle in root.glob("*/android/build.gradle*"):

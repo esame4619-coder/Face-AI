@@ -58,3 +58,16 @@ Last updated: 2026-11-25
 
 ## Resume instruction
 Continue directly from this checkpoint. Do not ask the user to repeat project requirements. Next, strengthen backend tests and audit/implement the six tools; do not create a new APK unless Flutter code changes.
+
+
+## Additional grouped pass (2026-11-25)
+- Backend API Tests #74 (run `45546300658`) SUCCESS; Manager Docker Build Check #49 (run `45546300588`) SUCCESS.
+- Added video failure-path tests in `backend/tests/test_video_failures.py`: no-face detection maps to a controlled 503; ffprobe process failure maps to a controlled 400.
+- Backend API Tests #75 (run `45548055464`) SUCCESS; Manager Docker Build Check #50 (run `45548055371`) SUCCESS.
+- Extended `backend/tests/test_worker_pool.py` with concurrent quota reservation, video detection failover without consuming quota, and video swap forwarding/API-key/quota tests. Commit: `a9a9251ea6e876894d1b5a48398cefe84f578e0e`.
+- Backend API Tests #76 (run `45548109911`) SUCCESS.
+- Clarified MP4/MOV support in backend error text and Flutter video picker description. Backend commit: `3dea14f88b4f036c6be1d960a44f2cbbf439d97a`; Flutter commit: `454d1e0049eb3286a6ea202ce17950edf3c28a3b`.
+- Added MOV container acceptance test and fixed its ffprobe fixture newline. Latest test fixture commit: `6b6ec4fe2b258df102f7768065de0c1c8bac0398`.
+- Latest CI at checkpoint: Backend API Tests #77 run `45548122148` is in progress on commit `29a479afc285394734c4da81e427b76b175f92aa`; Manager Docker Build Check #52 run `45548122186` is in progress on same commit. APK Build #108 run `45548116299` is in progress on Flutter commit `454d1e0049eb3286a6ea202ce17950edf3c28a3b`. Poll all three before reporting final status.
+- The audio/voice screens remain UI-only and explicitly tell users no processing engine is connected yet. Do not present them as working features. Image enhancement is basic Pillow/Lanczos, not AI super-resolution.
+- Worker quota reservation is intentionally charged before processing; a worker attempt that fails after dispatch may still count. This avoids unsafe refunds when a timed-out worker may actually have completed work. If exposing usage to users, label it as attempts/processing slots rather than guaranteed successful outputs.

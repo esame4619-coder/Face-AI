@@ -50,3 +50,12 @@ Last updated: 2026-11-25
 
 ## Resume instruction
 When the user returns, continue from this checkpoint without asking them to repeat project details. Start by checking the latest GitHub Actions run for build #107 and then proceed with validation/fixes.
+
+
+## Latest grouped validation pass (2026-11-25)
+- `backend/main.py`: reference frame and face positions now reject negative values; the 1–60 second duration rule is documented accurately. Face discovery intentionally does not consume a second worker quota slot for the same video-swap operation.
+- `backend/engine.py` commit `9a6e128ff0408f60260e211a7520a33bc3e623fb` explicitly uses FaceFusion's `large-small` selector order for both preview and processing, matching the order of the selectable thumbnails.
+- Backend API Tests #70 (run `45541715790`) and #71 (run `45541780503`) passed.
+- Expanded test commit `e563ea32265a39d87940de93add19b8fa2ee5ccc` added ffprobe duration/container tests and a mocked video-engine command/audio-mux test. Run #72 failed 1 test because the test fixture encoded literal `\\n` instead of line breaks; 42 other tests passed.
+- Fixed that test fixture in commit `bcea8b88576094f4b6c2cf8c9c38f5ba7d36d7a3`. Backend API Tests #73 (run `45541928715`) is currently in progress. Check its result before making further changes.
+- Latest backend test command is expected to cover 43 tests. Do not report it as passing until run #73 completes.

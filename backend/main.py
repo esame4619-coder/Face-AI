@@ -7,13 +7,13 @@ import subprocess
 from pathlib import Path
 from io import BytesIO
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 from engine import face_swap_engine
-from worker_pool import dispatch_faceswap, dispatch_video_faceswap, pool_status
+from worker_pool import dispatch_faceswap, dispatch_video_faceswap, dispatch_video_face_detection, pool_status
 
 
 app = FastAPI(
@@ -208,13 +208,44 @@ def inspect_video(data: bytes) -> float:
             raise HTTPException(400, "الفيديو لازم يكون MP4 ومدته من ثانية إلى 60 ثانية.") from None
 
 
+
+@app.post("/api/video-faces")
+async def detect_video_faces(
+    target_video: UploadFile = File(...),
+    _auth: None = Depends(verify_api_key),
+):
+    """Return selectable face thumbnails from the sampled frame with most detected faces."""
+    if target_video.content_type not in {"video/mp4", "application/mp4", "video/quicktime"}:
+        raise HTTPException(400, "صيغة الفيديو المدعومة هي MP4 فقط.")
+    video_data = await target_video.read(MAX_VIDEO_SIZE + 1)
+    if not video_data:
+        raise HTTPException(400, "ملف الفيديو فارغ.")
+    if len(video_data) > MAX_VIDEO_SIZE:
+        raise HTTPException(413, "الحد الأقصى لحجم الفيديو 100 ميجابايت.")
+    inspect_video(video_data)
+    try:
+        if os.getenv("WORKERS_JSON", "").strip():
+            result, worker_name = await dispatch_video_face_detection(video_data)
+        else:
+            result = await asyncio.to_thread(face_swap_engine.detect_video_faces, video_data)
+            worker_name = "local"
+        result["worker"] = worker_name
+        return result
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Video face detection failed")
+        raise HTTPException(503, "تعذر اكتشاف الوجوه في الفيديو. تأكد من جاهزية محرك FaceFusion.")
+
 @app.post("/api/faceswap-video")
 async def face_swap_video(
     source: UploadFile = File(...),
     target_video: UploadFile = File(...),
+    reference_frame_number: int = Form(default=0),
+    reference_face_position: int = Form(default=0),
     _auth: None = Depends(verify_api_key),
 ):
-    """Swap a source face into an MP4 video using the installed FaceFusion engine."""
+    """Swap a source face into the selected person in an MP4 video."""
     if source.content_type and not source.content_type.startswith("image/"):
         raise HTTPException(400, "ملف الوجه الأصلي لازم يكون صورة.")
     if target_video.content_type not in {"video/mp4", "application/mp4", "video/quicktime"}:
@@ -230,7 +261,7 @@ async def face_swap_video(
 
     try:
         if os.getenv("WORKERS_JSON", "").strip():
-            result, worker_name = await dispatch_video_faceswap(source_data, video_data)
+            result, worker_name = await dispatch_video_faceswap(source_data, video_data, reference_frame_number, reference_face_position)
         else:
             if not face_swap_engine.is_available():
                 raise HTTPException(503, "محرك FaceFusion غير مثبت ولا توجد سيرفرات معالجة مرتبطة.")
@@ -241,6 +272,8 @@ async def face_swap_video(
                     source_data,
                     video_data,
                     str(output_path),
+                    reference_frame_number,
+                    reference_face_position,
                 )
                 if not output_path.is_file():
                     raise RuntimeError("Video output was not generated")

@@ -184,7 +184,7 @@ MAX_VIDEO_DURATION = 60.0
 
 
 def inspect_video(data: bytes) -> float:
-    """Validate MP4 container and enforce the agreed 1–120 second duration."""
+    """Validate an MP4/MOV container and enforce the 1–60 second duration."""
     with tempfile.NamedTemporaryFile(suffix=".mp4") as temp:
         temp.write(data)
         temp.flush()
@@ -214,7 +214,11 @@ async def detect_video_faces(
     target_video: UploadFile = File(...),
     _auth: None = Depends(verify_api_key),
 ):
-    """Return selectable face thumbnails from the sampled frame with most detected faces."""
+    """Return selectable face thumbnails from the sampled frame with most detected faces.
+
+    Detection is a preparation step for one video-swap job, so it intentionally
+    does not consume a second worker quota slot.
+    """
     if target_video.content_type not in {"video/mp4", "application/mp4", "video/quicktime"}:
         raise HTTPException(400, "صيغة الفيديو المدعومة هي MP4 فقط.")
     video_data = await target_video.read(MAX_VIDEO_SIZE + 1)
@@ -241,8 +245,8 @@ async def detect_video_faces(
 async def face_swap_video(
     source: UploadFile = File(...),
     target_video: UploadFile = File(...),
-    reference_frame_number: int = Form(default=0),
-    reference_face_position: int = Form(default=0),
+    reference_frame_number: int = Form(default=0, ge=0),
+    reference_face_position: int = Form(default=0, ge=0),
     _auth: None = Depends(verify_api_key),
 ):
     """Swap a source face into the selected person in an MP4 video."""

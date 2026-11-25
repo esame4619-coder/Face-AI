@@ -318,3 +318,24 @@ def test_inspect_video_accepts_mov_container(monkeypatch):
         )(),
     )
     assert main.inspect_video(b"video") == 12.0
+
+
+def test_video_face_detection_accepts_quicktime_mov(monkeypatch):
+    monkeypatch.delenv("WORKERS_JSON", raising=False)
+    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.setattr(main, "inspect_video", lambda _data: 2.0)
+    monkeypatch.setattr(
+        main.face_swap_engine,
+        "detect_video_faces",
+        lambda _data: {
+            "reference_frame_number": 0,
+            "reference_time_seconds": 0.0,
+            "faces": [{"image": "ZmFrZQ==", "score": 0.9}],
+        },
+    )
+    response = client.post(
+        "/api/video-faces",
+        files={"target_video": ("clip.mov", b"mov-data", "video/quicktime")},
+    )
+    assert response.status_code == 200
+    assert response.json()["faces"][0]["score"] == 0.9

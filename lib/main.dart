@@ -549,6 +549,7 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
   VideoPlayerController? player;
   List<Map<String, dynamic>> detectedFaces = [];
   int referenceFrameNumber = 0;
+  double referenceTimeSeconds = 0;
   int selectedFaceIndex = 0;
   bool processing = false;
   bool detecting = false;
@@ -586,6 +587,7 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
         detectedFaces = [];
         selectedFaceIndex = 0;
         referenceFrameNumber = 0;
+        referenceTimeSeconds = 0;
         resultVideo = null;
       });
     }
@@ -612,6 +614,7 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
       setState(() {
         detectedFaces = faces;
         referenceFrameNumber = (body['reference_frame_number'] as num?)?.toInt() ?? 0;
+        referenceTimeSeconds = (body['reference_time_seconds'] as num?)?.toDouble() ?? 0;
         selectedFaceIndex = 0;
       });
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم اكتشاف ${faces.length} وجه في لقطة من الفيديو. اختار الشخص المطلوب.')));
@@ -683,7 +686,7 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
         ),
         if (detectedFaces.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Text('اختار الشخص اللي عايز تبدّل وجهه • لقطة مرجعية عند الثانية ${(referenceFrameNumber / 25).toStringAsFixed(1)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text('اختار الشخص اللي عايز تبدّل وجهه • لقطة مرجعية عند الثانية ${referenceTimeSeconds.toStringAsFixed(1)}', style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           GridView.builder(
             shrinkWrap: true,

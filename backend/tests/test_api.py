@@ -234,3 +234,76 @@ def test_video_swap_rejects_negative_reference_values():
         },
     )
     assert response.status_code == 422
+
+def test_inspect_video_accepts_mp4_under_duration_limit(monkeypatch):
+    monkeypatch.setattr(
+        main.subprocess,
+        "run",
+        lambda *_args, **_kwargs: type(
+            "ProbeResult", (), {"stdout": "duration=30.0\\nformat_name=mov,mp4,m4a", "returncode": 0}
+        )(),
+    )
+    assert main.inspect_video(b"video") == 30.0
+
+
+def test_inspect_video_rejects_duration_over_limit(monkeypatch):
+    monkeypatch.setattr(
+        main.subprocess,
+        "run",
+        lambda *_args, **_kwargs: type(
+            "ProbeResult", (), {"stdout": "duration=61.0\\nformat_name=mov,mp4", "returncode": 0}
+        )(),
+    )
+    with pytest.raises(HTTPException) as error:
+        main.inspect_video(b"video")
+    assert error.value.status_code == 400
+
+
+def test_inspect_video_rejects_non_mp4_container(monkeypatch):
+    monkeypatch.setattr(
+        main.subprocess,
+        "run",
+        lambda *_args, **_kwargs: type(
+            "ProbeResult", (), {"stdout": "duration=10.0\\nformat_name=avi", "returncode": 0}
+        )(),
+    )
+    with pytest.raises(HTTPException) as error:
+        main.inspect_video(b"video")
+    assert error.value.status_code == 400
+
+
+def test_video_engine_uses_reference_selector_and_restores_audio(tmp_path, monkeypatch):
+    engine = main.face_swap_engine
+    facefusion_file = tmp_path / "facefusion.py"
+    facefusion_file.write_text("# fake FaceFusion entrypoint")
+    monkeypatch.setattr(engine, "facefusion_path", facefusion_file)
+    monkeypatch.setattr(engine, "is_available", lambda: True)
+    calls = []
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        if command[0] == "python":
+            processed = Path(command[command.index("--output-path") + 1])
+            processed.write_bytes(b"silent-video")
+        else:
+            Path(command[-1]).write_bytes(b"video-with-audio")
+        return type("ProcessResult", (), {"returncode": 0, "stderr": "", "stdout": ""})()
+
+    monkeypatch.setattr(main.subprocess, "run", fake_run)
+    output = tmp_path / "result.mp4"
+    result = engine.swap_video(
+        b"source-image",
+        b"target-video",
+        str(output),
+        reference_frame_number=27,
+        reference_face_position=1,
+    )
+    assert result == output
+    assert output.read_bytes() == b"video-with-audio"
+    command = calls[0]
+    assert command[command.index("--face-selector-mode") + 1] == "reference"
+    assert command[command.index("--face-selector-order") + 1] == "large-small"
+    assert command[command.index("--reference-frame-number") + 1] == "27"
+    assert command[command.index("--reference-face-position") + 1] == "1"
+    assert calls[1][0] == "ffmpeg"
+    assert "-map" in calls[1] and "1:a:0?" in calls[1]

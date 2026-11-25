@@ -121,6 +121,7 @@ jobs:
           content = picker_gradle.read_text()
           original = content
           content = re.sub(r'compileSdkVersion\s+[^\s]+', 'compileSdkVersion 36', content)
+          content = re.sub(r'\bcompileSdk\s+[^\s]+', 'compileSdk 36', content)
           content = re.sub(r'compileSdk\s*=\s*[^\s]+', 'compileSdk = 36', content)
           if content == original:
               print("file_picker Gradle file:", picker_gradle)

@@ -547,12 +547,31 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
   final ImagePicker picker = ImagePicker();
   File? sourceFace, targetVideo, resultVideo;
   VideoPlayerController? player;
+  List<Map<String, dynamic>> detectedFaces = [];
+  int referenceFrameNumber = 0;
+  int selectedFaceIndex = 0;
   bool processing = false;
+  bool detecting = false;
+
+  Future<String> _baseUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    var base = (prefs.getString('backend_url') ?? '').trim();
+    while (base.endsWith('/')) { base = base.substring(0, base.length - 1); }
+    if (base.isEmpty) throw Exception('احفظ رابط خادم المعالجة من الإعدادات أولاً.');
+    return base;
+  }
+
+  Future<Map<String, String>> _headers() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = (prefs.getString('backend_api_key') ?? '').trim();
+    return key.isEmpty ? {} : {'Authorization': 'Bearer $key'};
+  }
 
   Future<void> chooseFace() async {
     final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 100);
     if (file != null && mounted) setState(() => sourceFace = File(file.path));
   }
+
   Future<void> chooseVideo() async {
     final file = await picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(seconds: 60));
     if (file == null) return;
@@ -561,19 +580,56 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حجم الفيديو أكبر من 100 ميجابايت.')));
       return;
     }
-    if (mounted) setState(() => targetVideo = selected);
+    if (mounted) {
+      setState(() {
+        targetVideo = selected;
+        detectedFaces = [];
+        selectedFaceIndex = 0;
+        referenceFrameNumber = 0;
+        resultVideo = null;
+      });
+    }
   }
+
+  Future<void> detectFaces() async {
+    if (targetVideo == null || detecting || processing) return;
+    setState(() => detecting = true);
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('${await _baseUrl()}/api/video-faces'));
+      request.headers.addAll(await _headers());
+      request.files.add(await http.MultipartFile.fromPath('target_video', targetVideo!.path));
+      final streamed = await request.send().timeout(const Duration(minutes: 15));
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode != 200) {
+        var detail = 'الخادم رد برمز ${response.statusCode}.';
+        try { final body = jsonDecode(response.body); if (body is Map && body['detail'] != null) detail = body['detail'].toString(); } catch (_) {}
+        throw Exception(detail);
+      }
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final faces = (body['faces'] as List? ?? []).cast<Map<String, dynamic>>();
+      if (faces.isEmpty) throw Exception('لم يتم العثور على وجوه في الفيديو.');
+      if (!mounted) return;
+      setState(() {
+        detectedFaces = faces;
+        referenceFrameNumber = (body['reference_frame_number'] as num?)?.toInt() ?? 0;
+        selectedFaceIndex = 0;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم اكتشاف ${faces.length} وجه في لقطة من الفيديو. اختار الشخص المطلوب.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر اكتشاف الوجوه: $e')));
+    } finally {
+      if (mounted) setState(() => detecting = false);
+    }
+  }
+
   Future<void> processVideo() async {
-    if (sourceFace == null || targetVideo == null || processing) return;
+    if (sourceFace == null || targetVideo == null || detectedFaces.isEmpty || processing) return;
     setState(() => processing = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      var base = (prefs.getString('backend_url') ?? '').trim();
-      while (base.endsWith('/')) { base = base.substring(0, base.length - 1); }
-      if (base.isEmpty) throw Exception('احفظ رابط خادم المعالجة من الإعدادات أولاً.');
-      final key = (prefs.getString('backend_api_key') ?? '').trim();
-      final request = http.MultipartRequest('POST', Uri.parse('$base/api/faceswap-video'));
-      if (key.isNotEmpty) request.headers['Authorization'] = 'Bearer $key';
+      final request = http.MultipartRequest('POST', Uri.parse('${await _baseUrl()}/api/faceswap-video'));
+      request.headers.addAll(await _headers());
+      request.fields['reference_frame_number'] = referenceFrameNumber.toString();
+      request.fields['reference_face_position'] = selectedFaceIndex.toString();
       request.files.add(await http.MultipartFile.fromPath('source', sourceFace!.path));
       request.files.add(await http.MultipartFile.fromPath('target_video', targetVideo!.path));
       final streamed = await request.send().timeout(const Duration(minutes: 65));
@@ -594,10 +650,14 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تجهيز الفيديو وحفظه داخل أعمالي.')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذرت معالجة الفيديو: $e')));
-    } finally { if (mounted) setState(() => processing = false); }
+    } finally {
+      if (mounted) setState(() => processing = false);
+    }
   }
+
   @override
   void dispose() { player?.dispose(); super.dispose(); }
+
   Widget selectionCard(String title, String subtitle, IconData icon, VoidCallback action, {String? filename}) {
     return Card(child: ListTile(
       leading: Icon(icon, color: const Color(0xFF9B7BFA), size: 32),
@@ -605,20 +665,59 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
       trailing: const Icon(Icons.upload_file), onTap: action,
     ));
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('تبديل الوجوه بالفيديو')),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        const Text('اختار صورة الوجه والفيديو اللي عايز تبدّل الوجه فيه.', style: TextStyle(fontSize: 16)),
+        const Text('اختار صورة الوجه البديل والفيديو اللي عايز تبدّل فيه وجه شخص محدد.', style: TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
-        selectionCard('صورة الوجه الأصلي', 'اختار صورة واضحة للوجه', Icons.face, chooseFace, filename: sourceFace?.path.split('/').last),
+        selectionCard('صورة الوجه البديل', 'اختار صورة واضحة للوجه', Icons.face, chooseFace, filename: sourceFace?.path.split('/').last),
         selectionCard('الفيديو المستهدف', 'MP4 • من ثانية إلى 60 ثانية • حتى 100MB', Icons.video_file, chooseVideo, filename: targetVideo?.path.split('/').last),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: targetVideo != null && !detecting && !processing ? detectFaces : null,
+          icon: detecting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.face_retouching_natural),
+          label: Text(detecting ? 'جاري اكتشاف الوجوه...' : 'اكتشاف الوجوه في الفيديو'),
+        ),
+        if (detectedFaces.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text('اختار الشخص اللي عايز تبدّل وجهه • لقطة مرجعية عند الثانية ${(referenceFrameNumber / 25).toStringAsFixed(1)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: detectedFaces.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 0.82),
+            itemBuilder: (context, index) {
+              final selected = selectedFaceIndex == index;
+              final bytes = base64Decode(detectedFaces[index]['image'] as String);
+              return InkWell(
+                onTap: () => setState(() => selectedFaceIndex = index),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: selected ? const Color(0xFF9B7BFA) : Colors.white24, width: selected ? 3 : 1),
+                    color: const Color(0xFF1B1E2E),
+                  ),
+                  padding: const EdgeInsets.all(6),
+                  child: Column(children: [
+                    Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.memory(bytes, fit: BoxFit.cover, width: double.infinity))),
+                    const SizedBox(height: 5),
+                    Text(selected ? '✓ الشخص المحدد' : 'الشخص ${index + 1}', style: const TextStyle(fontSize: 12)),
+                  ]),
+                ),
+              );
+            },
+          ),
+        ],
         const SizedBox(height: 12),
         FilledButton.icon(
-          onPressed: sourceFace != null && targetVideo != null && !processing ? processVideo : null,
+          onPressed: sourceFace != null && targetVideo != null && detectedFaces.isNotEmpty && !processing ? processVideo : null,
           icon: processing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome),
-          label: Text(processing ? 'جاري معالجة الفيديو...' : 'ابدأ تبديل الوجه'),
+          label: Text(processing ? 'جاري معالجة الفيديو...' : 'ابدأ تبديل وجه الشخص المحدد'),
         ),
         if (processing) const Padding(padding: EdgeInsets.all(16), child: Text('قد تستغرق المعالجة وقتًا حسب طول الفيديو وقدرة السيرفر.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60))),
         if (resultVideo != null && player != null) ...[

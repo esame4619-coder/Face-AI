@@ -112,28 +112,22 @@ jobs:
           from pathlib import Path
           import re
           root = Path.home() / ".pub-cache" / "hosted" / "pub.dev"
-          patterns = [
-              re.compile(r'(compileSdk\\s*=\\s*)(?:flutter\\.compileSdkVersion|[0-9]+)'),
-              re.compile(r'(compileSdk\\s+)(?:flutter\\.compileSdkVersion|[0-9]+)'),
-              re.compile(r'(compileSdkVersion\\s*=?\\s*)(?:flutter\\.compileSdkVersion|[0-9]+)'),
-          ]
-          changed = []
-          picker_files = []
-          for gradle in root.rglob("build.gradle*"):
-              if "file_picker-" in str(gradle):
-                  picker_files.append(gradle)
-              content = gradle.read_text(errors="ignore")
-              original = content
-              for pattern in patterns:
-                  content = pattern.sub(r'\\g<1>36', content)
-              if content != original:
-                  gradle.write_text(content)
-                  changed.append(str(gradle))
-          print("Patched Android plugin Gradle files:")
-          print("\\n".join(changed) if changed else "No plugin Gradle files needed changes")
-          print("file_picker Gradle files found:", [str(p) for p in picker_files])
-          if not any("file_picker-" in item for item in changed):
-              raise SystemExit("ERROR: file_picker compileSdk was not patched; refusing to continue")
+          picker_gradle = root / "file_picker-8.3.7" / "android" / "build.gradle"
+          if not picker_gradle.exists():
+              matches = list(root.glob("file_picker-*/android/build.gradle"))
+              if not matches:
+                  raise SystemExit("file_picker Android Gradle file not found")
+              picker_gradle = matches[0]
+          content = picker_gradle.read_text()
+          original = content
+          content = re.sub(r'compileSdkVersion\\s+[^\\s]+', 'compileSdkVersion 36', content)
+          content = re.sub(r'compileSdk\\s*=\\s*[^\\s]+', 'compileSdk = 36', content)
+          if content == original:
+              print("file_picker Gradle file:", picker_gradle)
+              print(content)
+              raise SystemExit("Could not locate file_picker compileSdk declaration")
+          picker_gradle.write_text(content)
+          print("Patched file_picker compileSdk to 36:", picker_gradle)
           PY
 
       - name: Build APK

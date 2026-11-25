@@ -131,3 +131,106 @@ def test_worker_quota_reservation_is_persisted(tmp_path, monkeypatch):
     assert _used_today("worker-a") == 1
     assert _try_reserve_job("worker-a", 1) is False
     assert _used_today("worker-a") == 1
+
+
+def test_video_face_detection_returns_local_face_choices(monkeypatch):
+    monkeypatch.delenv("WORKERS_JSON", raising=False)
+    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.setattr(main, "inspect_video", lambda _data: 4.2)
+
+    def fake_detect(data):
+        assert data == b"valid-video"
+        return {
+            "reference_frame_number": 42,
+            "reference_time_seconds": 1.68,
+            "faces": [{"image": "ZmFrZQ==", "score": 0.98}],
+        }
+
+    monkeypatch.setattr(main.face_swap_engine, "detect_video_faces", fake_detect)
+    response = client.post(
+        "/api/video-faces",
+        files={"target_video": ("clip.mp4", b"valid-video", "video/mp4")},
+    )
+    assert response.status_code == 200
+    assert response.json()["reference_frame_number"] == 42
+    assert response.json()["reference_time_seconds"] == 1.68
+    assert response.json()["faces"][0]["score"] == 0.98
+    assert response.json()["worker"] == "local"
+
+
+def test_video_face_detection_rejects_wrong_content_type():
+    response = client.post(
+        "/api/video-faces",
+        files={"target_video": ("clip.avi", b"video", "video/x-msvideo")},
+    )
+    assert response.status_code == 400
+
+
+def test_video_face_detection_rejects_empty_video():
+    response = client.post(
+        "/api/video-faces",
+        files={"target_video": ("clip.mp4", b"", "video/mp4")},
+    )
+    assert response.status_code == 400
+
+
+def test_video_face_detection_enforces_upload_limit(monkeypatch):
+    monkeypatch.setattr(main, "MAX_VIDEO_SIZE", 4)
+    response = client.post(
+        "/api/video-faces",
+        files={"target_video": ("clip.mp4", b"12345", "video/mp4")},
+    )
+    assert response.status_code == 413
+
+
+def test_video_face_detection_requires_api_key_when_configured(monkeypatch):
+    monkeypatch.setenv("API_KEY", "video-secret")
+    response = client.post(
+        "/api/video-faces",
+        files={"target_video": ("clip.mp4", b"video", "video/mp4")},
+    )
+    assert response.status_code == 401
+
+
+def test_video_swap_forwards_selected_reference_to_worker(monkeypatch):
+    monkeypatch.setenv("WORKERS_JSON", '[{"name":"worker-a","url":"https://worker.example"}]')
+    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.setattr(main, "inspect_video", lambda _data: 4.2)
+    captured = {}
+
+    async def fake_dispatch(source, video, frame_number, face_position):
+        captured.update(
+            source=source,
+            video=video,
+            frame_number=frame_number,
+            face_position=face_position,
+        )
+        return b"processed-mp4", "worker-a"
+
+    monkeypatch.setattr(main, "dispatch_video_faceswap", fake_dispatch)
+    response = client.post(
+        "/api/faceswap-video",
+        data={"reference_frame_number": "42", "reference_face_position": "2"},
+        files={
+            "source": ("face.png", make_png(), "image/png"),
+            "target_video": ("clip.mp4", b"valid-video", "video/mp4"),
+        },
+    )
+    assert response.status_code == 200
+    assert response.content == b"processed-mp4"
+    assert response.headers["x-worker-name"] == "worker-a"
+    assert captured["frame_number"] == 42
+    assert captured["face_position"] == 2
+    assert captured["video"] == b"valid-video"
+
+
+def test_video_swap_rejects_negative_reference_values():
+    response = client.post(
+        "/api/faceswap-video",
+        data={"reference_frame_number": "-1", "reference_face_position": "0"},
+        files={
+            "source": ("face.png", make_png(), "image/png"),
+            "target_video": ("clip.mp4", b"valid-video", "video/mp4"),
+        },
+    )
+    assert response.status_code == 422

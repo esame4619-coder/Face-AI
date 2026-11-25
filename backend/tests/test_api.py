@@ -314,7 +314,7 @@ def test_inspect_video_accepts_mov_container(monkeypatch):
         main.subprocess,
         "run",
         lambda *_args, **_kwargs: type(
-            "ProbeResult", (), {"stdout": "duration=12.0\\nformat_name=mov", "returncode": 0}
+            "ProbeResult", (), {"stdout": "duration=12.0\nformat_name=mov", "returncode": 0}
         )(),
     )
     assert main.inspect_video(b"video") == 12.0

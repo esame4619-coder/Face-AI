@@ -10,9 +10,9 @@ Last updated: 2026-11-25
 - Build workflow #107
 - Run ID: 45540671376
 - Commit: ccd6535d110a4293f435ea9b37ce1af16b893432
-- Status at last check: in_progress, currently on the "Build APK" step after dependencies and Android plugin compileSdk patch completed.
-- Build #106 (run 45540621347) was cancelled when the newer build was triggered.
-- Do not claim APK #107 is ready until the run succeeds and its artifact is downloaded and checked.
+- Final status: SUCCESS (completed 2026-11-25 03:37 UTC).
+- Artifact: `Face-AI-APK` (artifact id `14989476190`, ZIP size 25,453,112 bytes); downloaded as `Face-AI-build107.zip` and extracted to `/mnt/data/build107/app-release.apk`.
+- APK artifact was available and downloaded; build #107 is the current app build. Build #106 (run 45540621347) had been cancelled.
 - GitHub Actions run: https://github.com/esame4619-coder/Face-AI/actions/runs/45540671376
 
 ## Work just committed
@@ -23,9 +23,16 @@ Last updated: 2026-11-25
 - Latest Flutter commit: ccd6535d110a4293f435ea9b37ce1af16b893432 ("Show exact sampled video frame time in face selection").
 - Backend API Tests #68 passed on an earlier backend commit (f9c0c6e10be36eea3049a074b849817aa1a1c025); that does NOT yet prove the newest face-detection implementation passes tests.
 
+## New work completed after build #107
+- Backend main.py commit `4628be720d12d6a3429884afbbb02fe7eca43460`: corrected the inspect_video docstring to 1–60 seconds, constrained reference frame/face form values to non-negative integers, and documented that face discovery is a preparation step and does not consume a second worker quota slot.
+- Backend tests commit `d436cfee9f5aa76eab64363094eed2e24742bcbd`: added coverage for local video face detection, content type, empty file, upload size, API-key protection, selected-face forwarding to workers, and negative reference rejection.
+- Backend tests workflow #70 (run `45541715790`) completed SUCCESS on commit `d436cfee9f5aa76eab64363094eed2e24742bcbd`.
+- Engine commit `9a6e128ff0408f60260e211a7520a33bc3e623fb`: explicitly sets FaceFusion `face-selector-order=large-small` in preview detection and video processing so tile positions match.
+- FaceFusion 3.9.2 source was checked: `face_detector.detect_faces(frame)` returns bounding boxes, scores, and landmarks; `--reference-frame-number`, `--reference-face-position`, `--reference-face-distance`, `--face-selector-order`, and `--face-tracker-score` are actual CLI options. This validates names/signatures, but not a live GPU/model run.
+
 ## Important validation gaps / next actions
-1. First poll Build #107 (run 45540671376). If it succeeds, download artifact, extract APK, verify archive integrity, then share the exact APK link. If it fails, inspect job logs and fix the compile issue.
-2. Run backend tests on the latest main commit, especially imports and endpoint signatures.
+1. Poll the latest Backend API Tests run triggered by engine commit `9a6e128ff0408f60260e211a7520a33bc3e623fb`; fix any failure.
+2. Continue reviewing the FaceFusion helper initialization and test it on a worker with FaceFusion 3.9.2 and downloaded detector models. CLI/API names are verified against upstream source, but live inference is not yet verified.
 3. Review the actual FaceFusion 3.9.2 API/CLI integration in backend/engine.py. The detector helper imports FaceFusion modules and calls face_detector.detect_faces; verify the exact API and tuple return shape against the pinned source. Verify the CLI options used for reference selection are accepted by the installed FaceFusion version. Do not assume these calls are valid until tested.
 4. Inspect backend/main.py to confirm the existing inspect_video helper and all multipart field names match the new routes.
 5. Inspect worker_pool.py quota behavior: detection currently dispatches to workers without reserving/decrementing a daily job quota; decide whether detection should consume quota, and keep policy consistent.

@@ -307,3 +307,14 @@ def test_video_engine_uses_reference_selector_and_restores_audio(tmp_path, monke
     assert command[command.index("--reference-face-position") + 1] == "1"
     assert calls[1][0] == "ffmpeg"
     assert "-map" in calls[1] and "1:a:0?" in calls[1]
+
+
+def test_inspect_video_accepts_mov_container(monkeypatch):
+    monkeypatch.setattr(
+        main.subprocess,
+        "run",
+        lambda *_args, **_kwargs: type(
+            "ProbeResult", (), {"stdout": "duration=12.0\\nformat_name=mov", "returncode": 0}
+        )(),
+    )
+    assert main.inspect_video(b"video") == 12.0

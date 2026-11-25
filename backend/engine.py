@@ -76,6 +76,7 @@ class FaceSwapEngine:
                 "--output-path", str(processed_path),
                 "--processors", "face_swapper",
                 "--face-selector-mode", "reference",
+                "--face-selector-order", "large-small",
                 "--reference-frame-number", str(max(0, reference_frame_number)),
                 "--reference-face-position", str(max(0, reference_face_position)),
                 "--reference-face-distance", "0.3",
@@ -128,7 +129,8 @@ video_path = sys.argv[2]
 args_list = [
     "headless-run", "--source-paths", video_path, "--target-path", video_path,
     "--output-path", str(Path(video_path).with_name("unused.png")),
-    "--processors", "face_swapper", "--face-detector-model", "yolo_face",
+    "--processors", "face_swapper", "--face-selector-order", "large-small",
+    "--face-detector-model", "yolo_face",
     "--face-detector-size", "640x640", "--face-detector-score", "0.5"
 ]
 parser = create_program()

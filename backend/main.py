@@ -179,8 +179,8 @@ async def face_swap(
         raise HTTPException(503, "Face swap is temporarily unavailable")
 
 
-MAX_VIDEO_SIZE = 200 * 1024 * 1024
-MAX_VIDEO_DURATION = 120.0
+MAX_VIDEO_SIZE = 100 * 1024 * 1024
+MAX_VIDEO_DURATION = 60.0
 
 
 def inspect_video(data: bytes) -> float:
@@ -205,7 +205,7 @@ def inspect_video(data: bytes) -> float:
                 raise ValueError("duration outside allowed range")
             return duration
         except (subprocess.SubprocessError, ValueError, OSError):
-            raise HTTPException(400, "الفيديو لازم يكون MP4 ومدته من ثانية إلى 120 ثانية.") from None
+            raise HTTPException(400, "الفيديو لازم يكون MP4 ومدته من ثانية إلى 60 ثانية.") from None
 
 
 @app.post("/api/faceswap-video")
@@ -225,7 +225,7 @@ async def face_swap_video(
     if not video_data:
         raise HTTPException(400, "ملف الفيديو فارغ.")
     if len(video_data) > MAX_VIDEO_SIZE:
-        raise HTTPException(413, "الحد الأقصى لحجم الفيديو 200 ميجابايت.")
+        raise HTTPException(413, "الحد الأقصى لحجم الفيديو 100 ميجابايت.")
     inspect_video(video_data)
 
     try:

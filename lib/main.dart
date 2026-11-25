@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -308,9 +309,7 @@ class HomePage extends StatelessWidget {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ComingSoonPage(
-            title: names[type]!,
-          ),
+          builder: (_) => AudioStudioPage(mode: type, title: names[type]!),
         ),
       );
     }
@@ -829,46 +828,54 @@ class _ImageStudioState extends State<ImageStudio> {
   }
 }
 
-// الأدوات التي سيتم تطويرها
-
-class ComingSoonPage extends StatelessWidget {
-  final String title;
-
-  const ComingSoonPage({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.auto_awesome,
-              size: 75,
-              color: Color(0xFF9B7BFA),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 23,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'نجهز أدوات الاستوديو الخاص بك',
-              style: TextStyle(color: Colors.white60),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+// استوديوهات الصوت والأغاني. التوليد الفعلي ينتظر محرك المعالجة.
+class AudioStudioPage extends StatefulWidget {
+  final String mode; final String title;
+  const AudioStudioPage({super.key, required this.mode, required this.title});
+  @override State<AudioStudioPage> createState() => _AudioStudioPageState();
 }
-
+class _AudioStudioPageState extends State<AudioStudioPage> {
+  final name = TextEditingController(); final lyrics = TextEditingController(); final prompt = TextEditingController();
+  PlatformFile? audio; String language = 'مصري'; String genre = 'بوب'; bool consent = false; bool instrumental = false;
+  bool get clone => widget.mode == 'voice'; bool get change => widget.mode == 'changevoice';
+  Future<void> pickAudio() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['wav','mp3','m4a','aac','ogg','flac']);
+    if (result != null && result.files.isNotEmpty && mounted) setState(() => audio = result.files.single);
+  }
+  void prepare() {
+    if (clone && (name.text.trim().isEmpty || audio == null || !consent)) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل اسم النموذج وارفع عينة وأكد امتلاكك موافقة صاحب الصوت.'))); return; }
+    if (change && audio == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اختار الملف الصوتي أولاً.'))); return; }
+    if (!clone && !change && prompt.text.trim().isEmpty && lyrics.text.trim().isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب وصف الأغنية أو كلماتها.'))); return; }
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('المدخلات جاهزة. إنشاء الصوت/الأغنية سيتفعّل بعد توصيل محرك المعالجة؛ لا توجد نتيجة وهمية.')));
+  }
+  @override void dispose() { name.dispose(); lyrics.dispose(); prompt.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) {
+    return Scaffold(appBar: AppBar(title: Text(widget.title)), body: ListView(padding: const EdgeInsets.all(18), children: [
+      Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(clone ? 'أنشئ نموذجًا لصوت تملك حق استخدامه، ثم جهّز نصًا ليقرأه.' : change ? 'ارفع تسجيلًا وحدد اللهجة المطلوبة لتحويله.' : 'اكتب وصف الأغنية أو كلماتها وحدد اللون الموسيقي.'))),
+      const SizedBox(height: 16),
+      if (clone) ...[
+        TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم نموذج الصوت', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        _audioTile(),
+        CheckboxListTile(value: consent, onChanged: (v) => setState(() => consent = v ?? false), title: const Text('أؤكد أن لدي موافقة صاحب الصوت أو أن الصوت صوتي.'), subtitle: const Text('لا تستخدم تسجيلات أشخاص دون إذنهم.'), controlAffinity: ListTileControlAffinity.leading),
+        TextField(controller: lyrics, minLines: 3, maxLines: 5, decoration: const InputDecoration(labelText: 'النص الذي تريد أن يقرأه الصوت', border: OutlineInputBorder())),
+      ] else if (change) ...[
+        _audioTile(), const SizedBox(height: 12),
+        DropdownButtonFormField<String>(value: language, decoration: const InputDecoration(labelText: 'اللهجة / اللغة', border: OutlineInputBorder()), items: const ['مصري','خليجي','فصحى','إنجليزي أمريكي','إنجليزي بريطاني'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => language = v ?? language)),
+      ] else ...[
+        TextField(controller: prompt, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'وصف الأغنية', hintText: 'أغنية رومانسية مصرية بإيقاع هادئ...', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        TextField(controller: lyrics, minLines: 4, maxLines: 8, decoration: const InputDecoration(labelText: 'كلمات الأغنية (اختياري)', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(value: genre, decoration: const InputDecoration(labelText: 'اللون الموسيقي', border: OutlineInputBorder()), items: const ['بوب','رومانسي','شعبي','مهرجانات','روك','طربي','إنشاد','موسيقى سينمائية'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => genre = v ?? genre)),
+        SwitchListTile(value: instrumental, onChanged: (v) => setState(() => instrumental = v), title: const Text('موسيقى فقط بدون غناء')),
+      ],
+      const SizedBox(height: 20), FilledButton.icon(onPressed: prepare, icon: const Icon(Icons.play_arrow), label: Text(clone ? 'تجهيز نموذج الصوت' : change ? 'تجهيز تحويل الصوت' : 'تجهيز الأغنية')),
+      const SizedBox(height: 12), const Card(child: Padding(padding: EdgeInsets.all(14), child: Text('واجهة إعداد المهمة واختيار الملفات جاهزة. محرك الصوت والموسيقى لم يُربط بعد؛ التوصيل في المرحلة الأخيرة بعد اكتمال التطبيق.'))),
+    ]));
+  }
+  Widget _audioTile() => Card(child: ListTile(leading: const Icon(Icons.audio_file), title: Text(audio?.name ?? 'اختيار ملف صوتي'), subtitle: const Text('WAV / MP3 / M4A / AAC / OGG / FLAC'), trailing: const Icon(Icons.upload_file), onTap: pickAudio));
+}
 // صفحة أعمالي: تعرض النتائج المحفوظة محلياً على الهاتف
 
 class MyWorksPage extends StatefulWidget {
@@ -1032,7 +1039,7 @@ class _MyWorksPageState extends State<MyWorksPage> {
                           child: Column(
                             children: [
                               Expanded(
-                                child: Image.file(file, width: double.infinity, fit: BoxFit.cover),
+                                child: file.path.toLowerCase().endsWith('.mp4') ? Container(width: double.infinity, color: const Color(0xFF111321), child: const Center(child: Icon(Icons.play_circle_fill, size: 64, color: Color(0xFF9B7BFA)))) : Image.file(file, width: double.infinity, fit: BoxFit.cover),
                               ),
                               ListTile(
                                 dense: true,

@@ -240,7 +240,7 @@ def test_inspect_video_accepts_mp4_under_duration_limit(monkeypatch):
         main.subprocess,
         "run",
         lambda *_args, **_kwargs: type(
-            "ProbeResult", (), {"stdout": "duration=30.0\\nformat_name=mov,mp4,m4a", "returncode": 0}
+            "ProbeResult", (), {"stdout": "duration=30.0\nformat_name=mov,mp4,m4a", "returncode": 0}
         )(),
     )
     assert main.inspect_video(b"video") == 30.0
@@ -251,7 +251,7 @@ def test_inspect_video_rejects_duration_over_limit(monkeypatch):
         main.subprocess,
         "run",
         lambda *_args, **_kwargs: type(
-            "ProbeResult", (), {"stdout": "duration=61.0\\nformat_name=mov,mp4", "returncode": 0}
+            "ProbeResult", (), {"stdout": "duration=61.0\nformat_name=mov,mp4", "returncode": 0}
         )(),
     )
     with pytest.raises(HTTPException) as error:
@@ -264,7 +264,7 @@ def test_inspect_video_rejects_non_mp4_container(monkeypatch):
         main.subprocess,
         "run",
         lambda *_args, **_kwargs: type(
-            "ProbeResult", (), {"stdout": "duration=10.0\\nformat_name=avi", "returncode": 0}
+            "ProbeResult", (), {"stdout": "duration=10.0\nformat_name=avi", "returncode": 0}
         )(),
     )
     with pytest.raises(HTTPException) as error:

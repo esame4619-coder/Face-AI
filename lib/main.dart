@@ -117,7 +117,7 @@ class HomePage extends StatelessWidget {
     },
     {
       'name': 'تغيير الأصوات',
-      'description': 'المصرية والإنجليزية',
+      'description': 'اختيار صوت رجل أو امرأة أو طفل',
       'icon': Icons.graphic_eq,
       'color': Color(0xFF10B981),
       'type': 'changevoice',
@@ -554,11 +554,11 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
     if (file != null && mounted) setState(() => sourceFace = File(file.path));
   }
   Future<void> chooseVideo() async {
-    final file = await picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(seconds: 120));
+    final file = await picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(seconds: 60));
     if (file == null) return;
     final selected = File(file.path);
-    if (await selected.length() > 200 * 1024 * 1024) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حجم الفيديو أكبر من 200 ميجابايت.')));
+    if (await selected.length() > 100 * 1024 * 1024) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حجم الفيديو أكبر من 100 ميجابايت.')));
       return;
     }
     if (mounted) setState(() => targetVideo = selected);
@@ -613,7 +613,7 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
         const Text('اختار صورة الوجه والفيديو اللي عايز تبدّل الوجه فيه.', style: TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
         selectionCard('صورة الوجه الأصلي', 'اختار صورة واضحة للوجه', Icons.face, chooseFace, filename: sourceFace?.path.split('/').last),
-        selectionCard('الفيديو المستهدف', 'MP4 • من ثانية إلى 120 ثانية • حتى 200MB', Icons.video_file, chooseVideo, filename: targetVideo?.path.split('/').last),
+        selectionCard('الفيديو المستهدف', 'MP4 • من ثانية إلى 60 ثانية • حتى 100MB', Icons.video_file, chooseVideo, filename: targetVideo?.path.split('/').last),
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: sourceFace != null && targetVideo != null && !processing ? processVideo : null,
@@ -836,7 +836,7 @@ class AudioStudioPage extends StatefulWidget {
 }
 class _AudioStudioPageState extends State<AudioStudioPage> {
   final name = TextEditingController(); final lyrics = TextEditingController(); final prompt = TextEditingController();
-  PlatformFile? audio; String language = 'مصري'; String genre = 'بوب'; bool consent = false; bool instrumental = false;
+  PlatformFile? audio; String language = 'مصري'; String genre = 'بوب'; String mood = 'رومانسي'; String voiceType = 'رجل'; bool consent = false; bool instrumental = false;
   bool get clone => widget.mode == 'voice'; bool get change => widget.mode == 'changevoice';
   Future<void> pickAudio() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['wav','mp3','m4a','aac','ogg','flac']);
@@ -851,7 +851,7 @@ class _AudioStudioPageState extends State<AudioStudioPage> {
   @override void dispose() { name.dispose(); lyrics.dispose(); prompt.dispose(); super.dispose(); }
   @override Widget build(BuildContext context) {
     return Scaffold(appBar: AppBar(title: Text(widget.title)), body: ListView(padding: const EdgeInsets.all(18), children: [
-      Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(clone ? 'أنشئ نموذجًا لصوت تملك حق استخدامه، ثم جهّز نصًا ليقرأه.' : change ? 'ارفع تسجيلًا وحدد اللهجة المطلوبة لتحويله.' : 'اكتب وصف الأغنية أو كلماتها وحدد اللون الموسيقي.'))),
+      Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(clone ? 'أنشئ نموذجًا لصوت تملك حق استخدامه، ثم جهّز نصًا ليقرأه.' : change ? 'ارفع التسجيل واختار فئة الصوت الجديدة: رجل أو امرأة أو طفل.' : 'اكتب وصف الأغنية أو كلماتها وحدد اللون الموسيقي.'))),
       const SizedBox(height: 16),
       if (clone) ...[
         TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم نموذج الصوت', border: OutlineInputBorder())),
@@ -861,13 +861,19 @@ class _AudioStudioPageState extends State<AudioStudioPage> {
         TextField(controller: lyrics, minLines: 3, maxLines: 5, decoration: const InputDecoration(labelText: 'النص الذي تريد أن يقرأه الصوت', border: OutlineInputBorder())),
       ] else if (change) ...[
         _audioTile(), const SizedBox(height: 12),
-        DropdownButtonFormField<String>(value: language, decoration: const InputDecoration(labelText: 'اللهجة / اللغة', border: OutlineInputBorder()), items: const ['مصري','خليجي','فصحى','إنجليزي أمريكي','إنجليزي بريطاني'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => language = v ?? language)),
+        DropdownButtonFormField<String>(value: voiceType, decoration: const InputDecoration(labelText: 'نوع الصوت البديل', border: OutlineInputBorder()), items: const ['رجل','امرأة','طفل'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => voiceType = v ?? voiceType)),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(value: language, decoration: const InputDecoration(labelText: 'اللهجة (اختياري)', border: OutlineInputBorder()), items: const ['مصري','خليجي','فصحى','إنجليزي أمريكي','إنجليزي بريطاني'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => language = v ?? language)),
+
       ] else ...[
         TextField(controller: prompt, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'وصف الأغنية', hintText: 'أغنية رومانسية مصرية بإيقاع هادئ...', border: OutlineInputBorder())),
         const SizedBox(height: 12),
         TextField(controller: lyrics, minLines: 4, maxLines: 8, decoration: const InputDecoration(labelText: 'كلمات الأغنية (اختياري)', border: OutlineInputBorder())),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(value: genre, decoration: const InputDecoration(labelText: 'اللون الموسيقي', border: OutlineInputBorder()), items: const ['بوب','رومانسي','شعبي','مهرجانات','روك','طربي','إنشاد','موسيقى سينمائية'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => genre = v ?? genre)),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(value: mood, decoration: const InputDecoration(labelText: 'الإحساس والحالة العاطفية', border: OutlineInputBorder()), items: const ['حزين','شجن','عتاب','ألم','صحوة بعد الوجع','رومانسي','فرح','حماس','أمل'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => mood = v ?? mood)),
+
         SwitchListTile(value: instrumental, onChanged: (v) => setState(() => instrumental = v), title: const Text('موسيقى فقط بدون غناء')),
       ],
       const SizedBox(height: 20), FilledButton.icon(onPressed: prepare, icon: const Icon(Icons.play_arrow), label: Text(clone ? 'تجهيز نموذج الصوت' : change ? 'تجهيز تحويل الصوت' : 'تجهيز الأغنية')),

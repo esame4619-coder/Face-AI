@@ -220,7 +220,7 @@ async def detect_video_faces(
     does not consume a second worker quota slot.
     """
     if target_video.content_type not in {"video/mp4", "application/mp4", "video/quicktime"}:
-        raise HTTPException(400, "صيغة الفيديو المدعومة هي MP4 فقط.")
+        raise HTTPException(400, "صيغة الفيديو المدعومة هي MP4 أو MOV.")
     video_data = await target_video.read(MAX_VIDEO_SIZE + 1)
     if not video_data:
         raise HTTPException(400, "ملف الفيديو فارغ.")
@@ -253,7 +253,7 @@ async def face_swap_video(
     if source.content_type and not source.content_type.startswith("image/"):
         raise HTTPException(400, "ملف الوجه الأصلي لازم يكون صورة.")
     if target_video.content_type not in {"video/mp4", "application/mp4", "video/quicktime"}:
-        raise HTTPException(400, "صيغة الفيديو المدعومة هي MP4 فقط.")
+        raise HTTPException(400, "صيغة الفيديو المدعومة هي MP4 أو MOV.")
 
     source_data = await validate_image(source)
     video_data = await target_video.read(MAX_VIDEO_SIZE + 1)

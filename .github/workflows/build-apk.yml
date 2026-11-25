@@ -42,6 +42,37 @@ jobs:
         run: |
           flutter create --project-name face_ai --platforms=android --org com.esame.faceai scaffold
           cp -R scaffold/android ./android
+          # file_picker's Android lifecycle dependency now requires compileSdk 36+.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          candidates = [
+              Path("android/app/build.gradle.kts"),
+              Path("android/app/build.gradle"),
+          ]
+          gradle = next((p for p in candidates if p.exists()), None)
+          if gradle is None:
+              raise SystemExit("Android app Gradle file was not generated")
+          content = gradle.read_text()
+          if gradle.name.endswith(".kts"):
+              content, count = re.subn(
+                  r'compileSdk\s*=\s*(?:flutter\.compileSdkVersion|[0-9]+)',
+                  'compileSdk = 36',
+                  content,
+                  count=1,
+              )
+          else:
+              content, count = re.subn(
+                  r'compileSdkVersion\s+(?:flutter\.compileSdkVersion|[0-9]+)',
+                  'compileSdkVersion 36',
+                  content,
+                  count=1,
+              )
+          if count != 1:
+              raise SystemExit(f"Could not set compileSdk 36 in {gradle}")
+          gradle.write_text(content)
+          print(f"Configured {gradle} to compile against Android API 36")
+          PY
           python3 - <<'PY'
           from pathlib import Path
           manifest = Path("android/app/src/main/AndroidManifest.xml")

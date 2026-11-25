@@ -246,3 +246,80 @@ def test_daily_quota_reservation_is_atomic_under_concurrency(tmp_path, monkeypat
 
     assert sum(results) == limit
     assert worker_pool._used_today("shared-worker") == limit
+
+
+
+def test_video_detection_dispatch_fails_over_without_spending_job_quota(monkeypatch, tmp_path):
+    import asyncio
+
+    monkeypatch.setenv("POOL_DB_PATH", str(tmp_path / "video-detect.sqlite3"))
+    monkeypatch.setenv("WORKERS_JSON", json.dumps([
+        {"name": "worker-a", "url": "https://worker-a.example", "daily_jobs": 2, "api_key": "key-a"},
+        {"name": "worker-b", "url": "https://worker-b.example", "daily_jobs": 2, "api_key": "key-b"},
+    ]))
+    worker_pool._cursor = 0
+    attempts = []
+
+    class Response:
+        def __init__(self, status_code=200, payload=None):
+            self.status_code = status_code
+            self.is_success = 200 <= status_code < 300
+            self.content = b""
+            self._payload = payload or {}
+        def json(self): return self._payload
+
+    class Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return False
+        async def get(self, url, **kwargs):
+            return Response(payload={"status": "online"})
+        async def post(self, url, **kwargs):
+            attempts.append((url, kwargs.get("headers", {})))
+            if "worker-a" in url:
+                return Response(503)
+            return Response(payload={"faces": [{"image": "abc"}], "reference_frame_number": 5})
+
+    monkeypatch.setattr(worker_pool.httpx, "AsyncClient", lambda **kwargs: Client())
+    result, name = asyncio.run(worker_pool.dispatch_video_face_detection(b"video-bytes"))
+
+    assert name == "worker-b"
+    assert result["reference_frame_number"] == 5
+    assert attempts[0][1]["Authorization"] == "Bearer key-a"
+    assert attempts[1][1]["Authorization"] == "Bearer key-b"
+    assert worker_pool._used_today("worker-a") == 0
+    assert worker_pool._used_today("worker-b") == 0
+
+
+def test_video_swap_dispatch_forwards_reference_selection_and_counts_one_job(monkeypatch, tmp_path):
+    import asyncio
+
+    monkeypatch.setenv("POOL_DB_PATH", str(tmp_path / "video-swap.sqlite3"))
+    monkeypatch.setenv("WORKERS_JSON", json.dumps([
+        {"name": "worker-video", "url": "https://worker-video.example", "daily_jobs": 3, "api_key": "video-key"}
+    ]))
+    captured = {}
+
+    class Response:
+        status_code = 200
+        is_success = True
+        content = b"video-result"
+        def json(self): return {"status": "online"}
+
+    class Client:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): return False
+        async def get(self, url, **kwargs): return Response()
+        async def post(self, url, **kwargs):
+            captured.update(kwargs)
+            return Response()
+
+    monkeypatch.setattr(worker_pool.httpx, "AsyncClient", lambda **kwargs: Client())
+    result, name = asyncio.run(
+        worker_pool.dispatch_video_faceswap(b"face", b"video", 123, 2)
+    )
+
+    assert result == b"video-result"
+    assert name == "worker-video"
+    assert captured["headers"]["Authorization"] == "Bearer video-key"
+    assert captured["data"] == {"reference_frame_number": "123", "reference_face_position": "2"}
+    assert worker_pool._used_today("worker-video") == 1

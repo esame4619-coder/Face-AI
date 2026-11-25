@@ -677,7 +677,7 @@ class _VideoFaceSwapStudioState extends State<VideoFaceSwapStudio> {
         const Text('اختار صورة الوجه البديل والفيديو اللي عايز تبدّل فيه وجه شخص محدد.', style: TextStyle(fontSize: 16)),
         const SizedBox(height: 12),
         selectionCard('صورة الوجه البديل', 'اختار صورة واضحة للوجه', Icons.face, chooseFace, filename: sourceFace?.path.split('/').last),
-        selectionCard('الفيديو المستهدف', 'MP4 • من ثانية إلى 60 ثانية • حتى 100MB', Icons.video_file, chooseVideo, filename: targetVideo?.path.split('/').last),
+        selectionCard('الفيديو المستهدف', 'MP4 أو MOV • من ثانية إلى 60 ثانية • حتى 100MB', Icons.video_file, chooseVideo, filename: targetVideo?.path.split('/').last),
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: targetVideo != null && !detecting && !processing ? detectFaces : null,

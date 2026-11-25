@@ -88,3 +88,7 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 - Backend API Tests #80 run `45548349510` and Manager Docker Build Check #55 run `45548349368` are queued on that commit.
 - APK Build #108 run `45548116299` (Flutter commit `454d1e0049eb3286a6ea202ce17950edf3c28a3b`) was still in progress at the latest poll. It has not yet produced a confirmed downloadable artifact. Poll it and fetch artifact after success.
 - FaceFusion 3.9.2 source inspection reconfirmed `face_detector.pre_check()` downloads/checks detector models; `detect_faces(frame)` returns bounding boxes, scores and landmarks; `create_program()` exposes `headless-run`; and the CLI flags for detector model/size/score, selector order, reference frame and face position exist. This is static upstream-source validation only, not a successful live inference test.
+
+
+- Backend API Tests #80 (run `45548349510`) SUCCESS: 49 passed, 1 upstream Starlette/httpx deprecation warning. The new API-level MOV upload test passes.
+- Manager Docker Build Check #55 (run `45548349368`) was still in progress at this checkpoint.

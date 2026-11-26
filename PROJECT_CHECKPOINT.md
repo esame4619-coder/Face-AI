@@ -163,3 +163,17 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 - Backend API Tests #97 run `45755513414`: 65 passed, 1 upstream Starlette/httpx deprecation warning.
 - Android APK Build #118 run `45755507427` was in progress; it includes the voice EQ UI/API parameter. Wait for successful build and publish workflow before replacing the public APK link.
 - Colab notebook now makes a real authenticated EDSR x2 image enhancement request before it opens the public tunnel and fails early if EDSR inference is not actually available.
+
+
+## APK 120 final release — 2026-11-26
+- Android Build #120 run `45756203178`: SUCCESS. Flutter analyze, widget smoke tests, release APK build and artifact upload all passed.
+- Publish APK Download #30 run `45756854904`: SUCCESS.
+- Download: https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45756203178/app-release.apk
+- APK size: 53,713,679 bytes. SHA-256: `86caad0192d4d8f06c4d40b822c982e822f6ce28c133dbe5eb1db05a32d2afb4`.
+- pubspec version `1.0.0+4` so Android can install this as an update over build 116.
+- Backend API Tests #98 run `45756427467`: 65 passed.
+- Manager Docker Build Check #78 run `45756427536`: success. Manager #77 run `45756189980`: success with live Egyptian EQ FFmpeg conversion.
+- Latest changes include accurate availability badges for voice cloning/song tools, video card wording, voice EQ presets connected end-to-end, EDSR x2 image enhancement integration and safe Pillow fallback, and Colab preflight real EDSR inference verification.
+- EDSR inference has not yet been run by the user in their Colab session; notebook now verifies it before exposing the tunnel.
+- User must still install APK 120 on the phone and run Colab notebook to activate the real FaceFusion + EDSR worker. No persistent free GPU workers exist.
+- AI voice cloning and sung-lyrics song generation remain unimplemented because a suitable model with a compatible commercial license and workable free inference path has not been integrated. UI marks them as coming soon rather than pretending they work.

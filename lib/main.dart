@@ -105,14 +105,15 @@ class HomePage extends StatelessWidget {
     },
     {
       'name': 'استوديو الفيديو',
-      'description': 'إنشاء وتعديل فيديوهات AI',
+      'description': 'تبديل الوجه داخل فيديو MP4 أو MOV',
       'icon': Icons.movie_creation,
       'color': Color(0xFFEC4899),
       'type': 'video',
     },
     {
       'name': 'استنساخ الأصوات',
-      'description': 'إنشاء أصوات والتحكم فيها',
+      'description': 'محرك استنساخ الصوت قيد التجهيز',
+      'status': 'قريباً',
       'icon': Icons.record_voice_over,
       'color': Color(0xFF06B6D4),
       'type': 'voice',
@@ -126,14 +127,15 @@ class HomePage extends StatelessWidget {
     },
     {
       'name': 'صناعة الأغاني',
-      'description': 'إنشاء أغاني بالذكاء الاصطناعي',
+      'description': 'محرك توليد الأغاني قيد التجهيز',
+      'status': 'قريباً',
       'icon': Icons.music_note,
       'color': Color(0xFFF59E0B),
       'type': 'music',
     },
     {
       'name': 'تحسين الصور',
-      'description': 'تحسين أساسي وتكبير الصور',
+      'description': 'تحسين أساسي أو EDSR AI x2 عند توفر النموذج',
       'icon': Icons.auto_awesome,
       'color': Color(0xFF3B82F6),
       'type': 'enhance',
@@ -240,6 +242,24 @@ class HomePage extends StatelessWidget {
                             size: 35,
                           ),
                           const Spacer(),
+                          if (tool['status'] != null) ...[
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.amber.withValues(alpha: 0.35)),
+                                ),
+                                child: Text(
+                                  tool['status'],
+                                  style: const TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                          ],
                           Text(
                             tool['name'],
                             style: const TextStyle(

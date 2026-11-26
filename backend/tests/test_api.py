@@ -424,3 +424,33 @@ def test_enhance_corrects_exif_orientation_before_processing():
     assert response.status_code == 200
     result = Image.open(BytesIO(response.content))
     assert result.size == (20, 40)
+
+
+def test_change_voice_rejects_unknown_voice_type():
+    response = client.post(
+        "/api/change-voice",
+        data={"voice_type": "alien"},
+        files={"audio": ("voice.wav", b"not-audio", "audio/wav")},
+    )
+    assert response.status_code == 400
+    assert "نوع الصوت" in response.json()["detail"]
+
+
+def test_change_voice_rejects_empty_audio():
+    response = client.post(
+        "/api/change-voice",
+        data={"voice_type": "امرأة"},
+        files={"audio": ("voice.wav", b"", "audio/wav")},
+    )
+    assert response.status_code == 400
+    assert "فارغ" in response.json()["detail"]
+
+
+def test_change_voice_requires_api_key(monkeypatch):
+    monkeypatch.setenv("API_KEY", "audio-test-secret")
+    response = client.post(
+        "/api/change-voice",
+        data={"voice_type": "رجل"},
+        files={"audio": ("voice.wav", b"audio", "audio/wav")},
+    )
+    assert response.status_code == 401

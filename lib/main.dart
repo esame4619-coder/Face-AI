@@ -939,17 +939,53 @@ class AudioStudioPage extends StatefulWidget {
 }
 class _AudioStudioPageState extends State<AudioStudioPage> {
   final name = TextEditingController(); final lyrics = TextEditingController(); final prompt = TextEditingController();
-  PlatformFile? audio; String language = 'مصري'; String genre = 'بوب'; String mood = 'رومانسي'; String voiceType = 'رجل'; bool consent = false; bool instrumental = false;
+  PlatformFile? audio; String language = 'مصري'; String genre = 'بوب'; String mood = 'رومانسي'; String voiceType = 'رجل'; bool consent = false; bool instrumental = false; bool isProcessing = false; File? changedVoice;
   bool get clone => widget.mode == 'voice'; bool get change => widget.mode == 'changevoice';
   Future<void> pickAudio() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['wav','mp3','m4a','aac','ogg','flac']);
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, withData: true, allowedExtensions: ['wav','mp3','m4a','aac','ogg','flac']);
     if (result != null && result.files.isNotEmpty && mounted) setState(() => audio = result.files.single);
   }
-  void prepare() {
+  Future<void> prepare() async {
     if (clone && (name.text.trim().isEmpty || audio == null || !consent)) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل اسم النموذج وارفع عينة وأكد امتلاكك موافقة صاحب الصوت.'))); return; }
     if (change && audio == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اختار الملف الصوتي أولاً.'))); return; }
-    if (!clone && !change && prompt.text.trim().isEmpty && lyrics.text.trim().isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب وصف الأغنية أو كلماتها.'))); return; }
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('المدخلات جاهزة. إنشاء الصوت/الأغنية سيتفعّل بعد توصيل محرك المعالجة؛ لا توجد نتيجة وهمية.')));
+    if (change) { await convertVoice(); return; }
+    if (!clone && prompt.text.trim().isEmpty && lyrics.text.trim().isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اكتب وصف الأغنية أو كلماتها.'))); return; }
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('محرك استنساخ الصوت وتوليد الأغاني لم يُربط بعد. لم يتم إنشاء نتيجة وهمية.')));
+  }
+  Future<void> convertVoice() async {
+    if (audio == null || isProcessing) return;
+    setState(() => isProcessing = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var baseUrl = (prefs.getString('backend_url') ?? '').trim();
+      while (baseUrl.endsWith('/')) { baseUrl = baseUrl.substring(0, baseUrl.length - 1); }
+      if (baseUrl.isEmpty) throw Exception('احفظ عنوان خادم المعالجة من الإعدادات أولاً.');
+      final bytes = audio!.bytes;
+      if (bytes == null || bytes.isEmpty) throw Exception('تعذر قراءة الملف الصوتي؛ أعد اختياره.');
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/api/change-voice'));
+      final apiKey = (prefs.getString('backend_api_key') ?? '').trim();
+      if (apiKey.isNotEmpty) request.headers['Authorization'] = 'Bearer $apiKey';
+      request.fields['voice_type'] = voiceType;
+      request.files.add(http.MultipartFile.fromBytes('audio', bytes, filename: audio!.name));
+      final streamed = await request.send().timeout(const Duration(minutes: 6));
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode != 200) {
+        String message = 'الخادم رد برمز ${response.statusCode}.';
+        try { message = (jsonDecode(response.body) as Map)['detail']?.toString() ?? message; } catch (_) {}
+        throw Exception(message);
+      }
+      final directory = await getApplicationDocumentsDirectory();
+      final output = File('${directory.path}/changed_voice_${DateTime.now().millisecondsSinceEpoch}.mp3');
+      await output.writeAsBytes(response.bodyBytes, flush: true);
+      if (!mounted) return;
+      setState(() => changedVoice = output);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحويل الصوت وحفظ ملف MP3 داخل أعمالي.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحويل الصوت: $error')));
+    } finally {
+      if (mounted) setState(() => isProcessing = false);
+    }
   }
   @override void dispose() { name.dispose(); lyrics.dispose(); prompt.dispose(); super.dispose(); }
   @override Widget build(BuildContext context) {
@@ -979,8 +1015,10 @@ class _AudioStudioPageState extends State<AudioStudioPage> {
 
         SwitchListTile(value: instrumental, onChanged: (v) => setState(() => instrumental = v), title: const Text('موسيقى فقط بدون غناء')),
       ],
-      const SizedBox(height: 20), FilledButton.icon(onPressed: prepare, icon: const Icon(Icons.play_arrow), label: Text(clone ? 'تجهيز نموذج الصوت' : change ? 'تجهيز تحويل الصوت' : 'تجهيز الأغنية')),
-      const SizedBox(height: 12), const Card(child: Padding(padding: EdgeInsets.all(14), child: Text('واجهة إعداد المهمة واختيار الملفات جاهزة. محرك الصوت والموسيقى لم يُربط بعد؛ التوصيل في المرحلة الأخيرة بعد اكتمال التطبيق.'))),
+      const SizedBox(height: 20), FilledButton.icon(onPressed: isProcessing ? null : prepare, icon: isProcessing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.play_arrow), label: Text(isProcessing ? 'جارٍ تحويل الصوت...' : clone ? 'تجهيز نموذج الصوت' : change ? 'تحويل الصوت وحفظ MP3' : 'تجهيز الأغنية')),
+      if (change) const Padding(padding: EdgeInsets.only(top: 10), child: Text('تحويل محلي بتأثيرات طبقة الصوت عبر FFmpeg؛ ليس استنساخاً لهوية صوت شخص.', textAlign: TextAlign.center)),
+      if (changedVoice != null) Card(child: ListTile(leading: const Icon(Icons.audio_file), title: const Text('تم حفظ الصوت المحوّل'), subtitle: Text(changedVoice!.path), trailing: const Icon(Icons.check_circle))),
+      if (!change) const SizedBox(height: 12), if (!change) const Card(child: Padding(padding: EdgeInsets.all(14), child: Text('محرك استنساخ الصوت وتوليد الأغاني لم يُربط بعد؛ لن يتم عرض نتائج وهمية.'))),
     ]));
   }
   Widget _audioTile() => Card(child: ListTile(leading: const Icon(Icons.audio_file), title: Text(audio?.name ?? 'اختيار ملف صوتي'), subtitle: const Text('WAV / MP3 / M4A / AAC / OGG / FLAC'), trailing: const Icon(Icons.upload_file), onTap: pickAudio));
@@ -1015,7 +1053,8 @@ class _MyWorksPageState extends State<MyWorksPage> {
             final name = file.uri.pathSegments.last;
             return name.startsWith('faceswap_') ||
                 name.startsWith('enhanced_') ||
-                name.startsWith('faceswap_video_');
+                name.startsWith('faceswap_video_') ||
+                name.startsWith('changed_voice_');
           })
           .toList()
         ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
@@ -1034,6 +1073,7 @@ class _MyWorksPageState extends State<MyWorksPage> {
   String titleFor(File file) {
     final name = file.uri.pathSegments.last;
     if (name.startsWith('faceswap_video_')) return 'فيديو بعد تبديل الوجه';
+    if (name.startsWith('changed_voice_')) return 'صوت بعد تغيير الطبقة';
     return name.startsWith('faceswap_') ? 'نتيجة تبديل وجه' : 'صورة محسّنة';
   }
 

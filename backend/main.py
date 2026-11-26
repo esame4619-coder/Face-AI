@@ -338,11 +338,22 @@ def inspect_audio(data: bytes) -> float:
 async def change_voice(
     audio: UploadFile = File(...),
     voice_type: str = Form(...),
+    accent: str = Form(default="محايد"),
     _auth: None = Depends(verify_api_key),
 ):
-    """Apply an offline pitch/formant-style voice effect with FFmpeg (not AI cloning)."""
+    """Apply offline pitch and EQ effects with FFmpeg; this does not change spoken language or clone identity."""
     if voice_type not in {"رجل", "امرأة", "طفل"}:
         raise HTTPException(400, "نوع الصوت غير مدعوم.")
+    accent_filters = {
+        "محايد": "anull",
+        "مصري": "equalizer=f=180:t=q:w=1:g=1.5,equalizer=f=2500:t=q:w=1:g=1.0",
+        "خليجي": "equalizer=f=300:t=q:w=1:g=1.0,equalizer=f=4500:t=q:w=1:g=1.2",
+        "فصحى": "equalizer=f=220:t=q:w=1:g=0.8,equalizer=f=3200:t=q:w=1:g=1.4",
+        "إنجليزي أمريكي": "equalizer=f=150:t=q:w=1:g=1.0,equalizer=f=2800:t=q:w=1:g=1.0",
+        "إنجليزي بريطاني": "equalizer=f=180:t=q:w=1:g=0.8,equalizer=f=3600:t=q:w=1:g=1.0",
+    }
+    if accent not in accent_filters:
+        raise HTTPException(400, "طابع المعالجة الصوتية غير مدعوم.")
     data = await audio.read(MAX_AUDIO_SIZE + 1)
     if not data:
         raise HTTPException(400, "ملف الصوت فارغ.")
@@ -359,7 +370,7 @@ async def change_voice(
         sample_rate = 48000
         filter_chain = (
             f"asetrate={int(sample_rate * pitch)},aresample={sample_rate},"
-            f"atempo={1.0 / pitch:.6f},highpass=f=80,lowpass=f=12000"
+            f"atempo={1.0 / pitch:.6f},highpass=f=80,lowpass=f=12000,{accent_filters[accent]}"
         )
         try:
             completed = await asyncio.to_thread(

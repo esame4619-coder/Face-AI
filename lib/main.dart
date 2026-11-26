@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 // ignore: deprecated_member_use
-// Flutter 3.47 deprecates the Material umbrella import ahead of the material_ui migration.
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';

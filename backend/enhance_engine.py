@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from threading import Lock
 
-from PIL import Image
+from PIL import Image, ImageOps
 from io import BytesIO
 
 _MODEL = None
@@ -47,7 +47,7 @@ def enhance(data: bytes) -> bytes:
     cv2, model = loaded
     import numpy as np
     with Image.open(BytesIO(data)) as opened:
-        image = opened.convert("RGB")
+        image = ImageOps.exif_transpose(opened).convert("RGB")
         width, height = image.size
         scale = min(1.0, (4_000_000 / max(1, width * height)) ** 0.5, 2048 / max(width, height))
         if scale < 1.0:

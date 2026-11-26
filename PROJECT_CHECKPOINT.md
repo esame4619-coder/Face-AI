@@ -106,7 +106,13 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 
 
 - Android Build #109 run `45738195335`: SUCCESS. The new Flutter smoke test passed before APK compilation; APK upload passed.
-- Public release workflow run `45738904246`: SUCCESS. Downloadable APK: https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45738195335/app-release.apk
+- Public release workflow run `45738904246`: SUCCESS. Downloadable APK: https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45739348131/app-release.apk
 - APK size: 53,385,271 bytes. SHA-256: `10bf07ab870caeabf63060cb088f8fbb35e779049975bd016f97290f2d8891ed`.
 - Latest verified automated quality set: backend tests 57 passed; manager Docker image build passed; Flutter Arabic home-screen smoke test passed; Android release APK build and publication passed.
 - This is a CI-built installable app package, not proof of live AI inference or real-device compatibility. A real device installation and live FaceFusion worker test remain required.
+
+
+- Final Android Build #112 run `45739348131`: SUCCESS. Static analysis, Flutter widget smoke test, APK build and artifact upload all passed.
+- Public release workflow run `45740163450`: SUCCESS. Final APK #112 is published at https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45739348131/app-release.apk
+- Final APK SHA-256: `2a2e1dd072be466cf7b41c07362fe9a564576f3c23dc70aff0876f6b190451f8` (53,385,271 bytes).
+- Flutter analyzer initially identified deprecated dropdown parameters; these were migrated to `initialValue`. The remaining Flutter Material umbrella-import deprecation is currently suppressed at that import until Flutter's suggested replacement package is part of the stable SDK. Final analyzer gate passed.

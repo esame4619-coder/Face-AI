@@ -40,6 +40,9 @@ class FaceSwapEngine:
                 "--output-path", str(output),
                 "--processors", "face_swapper",
             ]
+            providers = os.getenv("FACEFUSION_EXECUTION_PROVIDERS", "").split()
+            if providers:
+                command.extend(["--execution-providers", *providers])
             completed = subprocess.run(
                 command,
                 capture_output=True,
@@ -82,6 +85,9 @@ class FaceSwapEngine:
                 "--reference-face-distance", "0.3",
                 "--face-tracker-score", "0.2",
             ]
+            providers = os.getenv("FACEFUSION_EXECUTION_PROVIDERS", "").split()
+            if providers:
+                command.extend(["--execution-providers", *providers])
             completed = subprocess.run(
                 command, capture_output=True, text=True, timeout=3600,
                 cwd=str(self.facefusion_path.parent), check=False,
@@ -133,6 +139,9 @@ args_list = [
     "--face-detector-model", "yolo_face",
     "--face-detector-size", "640x640", "--face-detector-score", "0.5"
 ]
+providers = os.getenv("FACEFUSION_EXECUTION_PROVIDERS", "").split()
+if providers:
+    args_list.extend(["--execution-providers", *providers])
 parser = create_program()
 args = vars(parser.parse_args(args_list))
 apply_args(args, state_manager.init_item)

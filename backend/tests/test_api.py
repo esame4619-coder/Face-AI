@@ -454,3 +454,23 @@ def test_change_voice_requires_api_key(monkeypatch):
         files={"audio": ("voice.wav", b"audio", "audio/wav")},
     )
     assert response.status_code == 401
+
+
+def test_change_voice_returns_mp3_when_ffmpeg_succeeds(monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(main, "inspect_audio", lambda _data: 2.0)
+
+    def fake_run(command, **_kwargs):
+        Path(command[-1]).write_bytes(b"mock-mp3-output")
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+    monkeypatch.setattr(main.subprocess, "run", fake_run)
+    response = client.post(
+        "/api/change-voice",
+        data={"voice_type": "امرأة"},
+        files={"audio": ("voice.wav", b"valid-audio-bytes", "audio/wav")},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("audio/mpeg")
+    assert response.content == b"mock-mp3-output"

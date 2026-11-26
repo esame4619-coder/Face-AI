@@ -500,3 +500,32 @@ def test_enhance_falls_back_when_edsr_fails(monkeypatch):
     assert response.status_code == 200
     assert response.headers["x-enhancement-engine"] == "Pillow-fallback"
     assert Image.open(BytesIO(response.content)).size == (64, 48)
+
+
+def test_change_voice_rejects_unknown_eq_preset():
+    response = client.post(
+        "/api/change-voice",
+        data={"voice_type": "رجل", "accent": "لهجة غير موجودة"},
+        files={"audio": ("voice.wav", b"not-audio", "audio/wav")},
+    )
+    assert response.status_code == 400
+    assert "طابع المعالجة" in response.json()["detail"]
+
+
+def test_change_voice_passes_selected_eq_preset_to_ffmpeg(monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setattr(main, "inspect_audio", lambda _data: 2.0)
+    captured = {}
+    def fake_run(command, **_kwargs):
+        captured["filter"] = command[command.index("-af") + 1]
+        Path(command[-1]).write_bytes(b"mock-mp3-output")
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
+    monkeypatch.setattr(main.subprocess, "run", fake_run)
+    response = client.post(
+        "/api/change-voice",
+        data={"voice_type": "امرأة", "accent": "مصري"},
+        files={"audio": ("voice.wav", b"valid-audio-bytes", "audio/wav")},
+    )
+    assert response.status_code == 200
+    assert "equalizer=f=180" in captured["filter"]
+    assert "equalizer=f=2500" in captured["filter"]

@@ -130,3 +130,18 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 - Manager Docker Build Check #61 run `45741189266`: SUCCESS.
 - Android Build #113 run `45741007604` (commit `2078da5b33feb9d1eaba505d7e77caa3b82d9736`) passed Flutter static analysis and widget smoke tests; APK compilation was still running at checkpoint update. Do not claim APK 113 published until build and release workflow succeed.
 - Colab GPU availability is not guaranteed; the notebook uses one temporary session and does not create a persistent multi-worker pool.
+
+
+## Final verified release — 2026-11-26
+- Android Build #116 (run `45742663569`) SUCCESS: Flutter analyze, widget smoke test, release APK build and artifact upload all passed.
+- Publish APK Download #26 (run `45743403455`) SUCCESS. Public APK: https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45742663569/app-release.apk
+- APK size: 53,713,679 bytes. SHA-256: `eabd5fe69a1a40a716051e79807a635bcdd08c8a12bdab71d077b61e9e72dc75`.
+- Backend API Tests #89 run `45742291420`: 61 passed.
+- Manager Docker Build Check #68 run `45742340148`: SUCCESS, including container startup, authenticated API health, a generated WAV upload, actual FFmpeg conversion, and MP3 output verification.
+- FaceFusion Docker Build Check #20 run `45741149004`: SUCCESS, including actual CPU FaceFusion inference and valid output image.
+- Manager runtime image now includes FFmpeg and `rotation_policy.py`; the latter was necessary for manager startup.
+- Colab notebook now supports GPU-aware installation (`cuda@12` when Colab GPU is allocated), explicit CUDA provider selection, and model pre-download/validation before opening the temporary tunnel.
+- Flutter My Works now previews saved MP3 outputs and offers native share/export.
+- User has confirmed APK 112 opens on their physical phone. APK 116 includes the voice-change and share/export changes; it still needs the user's physical-device install check.
+- Still not implemented: AI voice cloning, AI song generation, AI super-resolution. Voice changer is a tested FFmpeg pitch effect, not AI speaker identity conversion. Video identity consistency across multiple faces/occlusion remains unverified.
+- No free GPU host is provisioned persistently. The Colab notebook creates one temporary worker session only; it does not create 10 workers or guarantee 70 jobs/day.

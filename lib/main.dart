@@ -968,6 +968,7 @@ class _AudioStudioPageState extends State<AudioStudioPage> {
       final apiKey = (prefs.getString('backend_api_key') ?? '').trim();
       if (apiKey.isNotEmpty) request.headers['Authorization'] = 'Bearer $apiKey';
       request.fields['voice_type'] = voiceType;
+      request.fields['accent'] = language;
       request.files.add(http.MultipartFile.fromBytes('audio', bytes, filename: audio!.name));
       final streamed = await request.send().timeout(const Duration(minutes: 6));
       final response = await http.Response.fromStream(streamed);
@@ -1004,7 +1005,7 @@ class _AudioStudioPageState extends State<AudioStudioPage> {
         _audioTile(), const SizedBox(height: 12),
         DropdownButtonFormField<String>(initialValue: voiceType, decoration: const InputDecoration(labelText: 'نوع الصوت البديل', border: OutlineInputBorder()), items: const ['رجل','امرأة','طفل'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => voiceType = v ?? voiceType)),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(initialValue: language, decoration: const InputDecoration(labelText: 'اللهجة (اختياري)', border: OutlineInputBorder()), items: const ['مصري','خليجي','فصحى','إنجليزي أمريكي','إنجليزي بريطاني'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => language = v ?? language)),
+        DropdownButtonFormField<String>(initialValue: language, decoration: const InputDecoration(labelText: 'طابع المعالجة الصوتية EQ', border: OutlineInputBorder()), items: const ['مصري','خليجي','فصحى','إنجليزي أمريكي','إنجليزي بريطاني'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => language = v ?? language)),
 
       ] else ...[
         TextField(controller: prompt, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'وصف الأغنية', hintText: 'أغنية رومانسية مصرية بإيقاع هادئ...', border: OutlineInputBorder())),
@@ -1018,7 +1019,7 @@ class _AudioStudioPageState extends State<AudioStudioPage> {
         SwitchListTile(value: instrumental, onChanged: (v) => setState(() => instrumental = v), title: const Text('موسيقى فقط بدون غناء')),
       ],
       const SizedBox(height: 20), FilledButton.icon(onPressed: isProcessing ? null : prepare, icon: isProcessing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.play_arrow), label: Text(isProcessing ? 'جارٍ تحويل الصوت...' : clone ? 'تجهيز نموذج الصوت' : change ? 'تحويل الصوت وحفظ MP3' : 'تجهيز الأغنية')),
-      if (change) const Padding(padding: EdgeInsets.only(top: 10), child: Text('تحويل محلي بتأثيرات طبقة الصوت عبر FFmpeg؛ ليس استنساخاً لهوية صوت شخص.', textAlign: TextAlign.center)),
+      if (change) const Padding(padding: EdgeInsets.only(top: 10), child: Text('تأثيرات طبقة الصوت ومعادل EQ فقط؛ لا تغيّر اللهجة المنطوقة ولا تستنسخ هوية صوت شخص.', textAlign: TextAlign.center)),
       if (changedVoice != null) Card(child: ListTile(leading: const Icon(Icons.audio_file), title: const Text('تم حفظ الصوت المحوّل'), subtitle: Text(changedVoice!.path), trailing: const Icon(Icons.check_circle))),
       if (!change) const SizedBox(height: 12), if (!change) const Card(child: Padding(padding: EdgeInsets.all(14), child: Text('محرك استنساخ الصوت وتوليد الأغاني لم يُربط بعد؛ لن يتم عرض نتائج وهمية.'))),
     ]));

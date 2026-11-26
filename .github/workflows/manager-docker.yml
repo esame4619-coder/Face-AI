@@ -59,7 +59,7 @@ jobs:
           PY
           curl -fsS -X POST http://127.0.0.1:8000/api/change-voice \
             -H "Authorization: Bearer ci-audio-test-secret" \
-            -F "voice_type=امرأة" -F "audio=@$RUNNER_TEMP/input.wav" \
+            -F "voice_type=امرأة" -F "accent=مصري" -F "audio=@$RUNNER_TEMP/input.wav" \
             -o "$RUNNER_TEMP/changed.mp3"
           python - <<'PY'
           from pathlib import Path

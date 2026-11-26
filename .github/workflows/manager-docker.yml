@@ -63,6 +63,7 @@ jobs:
             -o "$RUNNER_TEMP/changed.mp3"
           python - <<'PY'
           from pathlib import Path
+          import os
           data = (Path(os.environ["RUNNER_TEMP"]) / "changed.mp3").read_bytes()
           assert data.startswith(b"ID3") or data[:1] == b"\xff", "Output is not a valid MP3 stream"
           print("Verified MP3 output bytes:", len(data))

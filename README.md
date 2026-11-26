@@ -77,7 +77,7 @@ pytest backend/tests -q
 - Backend API Tests: 57 اختبارًا ناجحًا.
 - Manager Docker image: تم بناؤها بنجاح في GitHub Actions.
 - Flutter widget smoke test: ناجح.
-- Android APK build #109: ناجح.
-- [تنزيل أحدث APK](https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45738195335/app-release.apk)
+- Android APK build #112: ناجح. Flutter static analysis: ناجح.
+- [تنزيل أحدث APK](https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45739348131/app-release.apk)
 
 نجاح الاختبارات والبناء لا يعني أن محرك FaceFusion أُجري عليه استدلال حي أو أن التطبيق اختُبر على هاتف فعلي؛ يجب تنفيذ هذين الاختبارين قبل إعلان جاهزية الإنتاج الكاملة.

@@ -103,3 +103,10 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 - Flutter smoke test passed in Android Build run `45738195335` (run #109). APK build was still running at the time this checkpoint entry was written; do not claim a new APK exists until the run and public release workflow both succeed.
 - Relevant commits: API tests `098e421576115a3f261d49fb94e94745b768a998`; video error logging `81bef3ba6e052867d655798942d34dc251507114`; Flutter smoke test `0bff1afb5ff314a4d9741ca6781aa7bf82d6e819`; APK workflow test gate `3e8a4e13df1f37ec07c67598dc196969d3bf5225`.
 - The six-tool UI is not equivalent to six live AI engines. Photo/video face swap still requires a real, reachable FaceFusion worker and a live inference test. Voice cloning, voice changing and song generation remain UI-only. Image enhancement is basic Pillow/Lanczos processing, not AI super-resolution. No free GPU workers are configured or verified.
+
+
+- Android Build #109 run `45738195335`: SUCCESS. The new Flutter smoke test passed before APK compilation; APK upload passed.
+- Public release workflow run `45738904246`: SUCCESS. Downloadable APK: https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45738195335/app-release.apk
+- APK size: 53,385,271 bytes. SHA-256: `10bf07ab870caeabf63060cb088f8fbb35e779049975bd016f97290f2d8891ed`.
+- Latest verified automated quality set: backend tests 57 passed; manager Docker image build passed; Flutter Arabic home-screen smoke test passed; Android release APK build and publication passed.
+- This is a CI-built installable app package, not proof of live AI inference or real-device compatibility. A real device installation and live FaceFusion worker test remain required.

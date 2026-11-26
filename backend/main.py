@@ -295,4 +295,5 @@ async def face_swap_video(
     except HTTPException:
         raise
     except Exception:
+        logger.exception("Video face swap processing failed")
         raise HTTPException(503, "تعذرت معالجة الفيديو حاليًا. تأكد من جاهزية محرك FaceFusion والسيرفر.")

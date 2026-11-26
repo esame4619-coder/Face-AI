@@ -30,4 +30,22 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile.manager
           push: false
+          load: true
           tags: face-ai-manager:test
+
+      - name: Run manager API and real FFmpeg voice conversion
+        run: |
+          set -euo pipefail
+          docker run -d --name face-ai-manager -p 8000:8000 -e API_KEY=ci-audio-test-secret face-ai-manager:test
+          trap 'docker rm -f face-ai-manager >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then break; fi
+            sleep 2
+          done
+          ffmpeg -hide_banner -loglevel error -f lavfi -i "sine=frequency=440:duration=2" -c:a pcm_s16le "$RUNNER_TEMP/input.wav"
+          curl -fsS -X POST http://127.0.0.1:8000/api/change-voice \
+            -H "Authorization: Bearer ci-audio-test-secret" \
+            -F "voice_type=امرأة" -F "audio=@$RUNNER_TEMP/input.wav" \
+            -o "$RUNNER_TEMP/changed.mp3"
+          test -s "$RUNNER_TEMP/changed.mp3"
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1 "$RUNNER_TEMP/changed.mp3"

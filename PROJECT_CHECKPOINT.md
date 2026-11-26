@@ -145,3 +145,13 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 - User has confirmed APK 112 opens on their physical phone. APK 116 includes the voice-change and share/export changes; it still needs the user's physical-device install check.
 - Still not implemented: AI voice cloning, AI song generation, AI super-resolution. Voice changer is a tested FFmpeg pitch effect, not AI speaker identity conversion. Video identity consistency across multiple faces/occlusion remains unverified.
 - No free GPU host is provisioned persistently. The Colab notebook creates one temporary worker session only; it does not create 10 workers or guarantee 70 jobs/day.
+
+
+## Continued work — 2026-11-26
+- Added optional EDSR x2 AI super-resolution engine in `backend/enhance_engine.py`; model is loaded lazily and only when a valid model file (>1 MB) is configured. Large images are downscaled to bound memory before inference.
+- `POST /api/enhance` now uses EDSR x2 when available and reports `X-Enhancement-Engine: EDSR-x2`; otherwise it safely falls back to Pillow and reports `Pillow-fallback`. Health endpoint reports `ai_enhance_available`.
+- Colab notebook installs OpenCV contrib and downloads the EDSR x2 model into `/content/models/EDSR_x2.pb`; model is active only in that temporary Colab session.
+- Flutter image studio now tells the user which enhancement engine actually processed the image.
+- Added two API tests. Backend API Tests #94 run `45754958762`: 63 passed. Manager Docker Build Check #73 run `45754958742`: success, including actual FFmpeg conversion and MP3 validation. Manager #72 also succeeded.
+- APK Build #117 run `45754977733` was in progress at checkpoint write; confirm completion and publish latest release before declaring updated APK ready.
+- Remaining audio model constraints: AI voice cloning and sung-lyrics music generation are still not activated. Do not claim these as functional. No persistent free GPU workers are provisioned.

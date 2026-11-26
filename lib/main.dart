@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+// ignore: deprecated_member_use
+// Flutter 3.47 deprecates the Material umbrella import ahead of the material_ui migration.
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -963,18 +965,18 @@ class _AudioStudioPageState extends State<AudioStudioPage> {
         TextField(controller: lyrics, minLines: 3, maxLines: 5, decoration: const InputDecoration(labelText: 'النص الذي تريد أن يقرأه الصوت', border: OutlineInputBorder())),
       ] else if (change) ...[
         _audioTile(), const SizedBox(height: 12),
-        DropdownButtonFormField<String>(value: voiceType, decoration: const InputDecoration(labelText: 'نوع الصوت البديل', border: OutlineInputBorder()), items: const ['رجل','امرأة','طفل'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => voiceType = v ?? voiceType)),
+        DropdownButtonFormField<String>(initialValue: voiceType, decoration: const InputDecoration(labelText: 'نوع الصوت البديل', border: OutlineInputBorder()), items: const ['رجل','امرأة','طفل'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => voiceType = v ?? voiceType)),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(value: language, decoration: const InputDecoration(labelText: 'اللهجة (اختياري)', border: OutlineInputBorder()), items: const ['مصري','خليجي','فصحى','إنجليزي أمريكي','إنجليزي بريطاني'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => language = v ?? language)),
+        DropdownButtonFormField<String>(initialValue: language, decoration: const InputDecoration(labelText: 'اللهجة (اختياري)', border: OutlineInputBorder()), items: const ['مصري','خليجي','فصحى','إنجليزي أمريكي','إنجليزي بريطاني'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => language = v ?? language)),
 
       ] else ...[
         TextField(controller: prompt, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'وصف الأغنية', hintText: 'أغنية رومانسية مصرية بإيقاع هادئ...', border: OutlineInputBorder())),
         const SizedBox(height: 12),
         TextField(controller: lyrics, minLines: 4, maxLines: 8, decoration: const InputDecoration(labelText: 'كلمات الأغنية (اختياري)', border: OutlineInputBorder())),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(value: genre, decoration: const InputDecoration(labelText: 'اللون الموسيقي', border: OutlineInputBorder()), items: const ['بوب','رومانسي','شعبي','مهرجانات','روك','طربي','إنشاد','موسيقى سينمائية'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => genre = v ?? genre)),
+        DropdownButtonFormField<String>(initialValue: genre, decoration: const InputDecoration(labelText: 'اللون الموسيقي', border: OutlineInputBorder()), items: const ['بوب','رومانسي','شعبي','مهرجانات','روك','طربي','إنشاد','موسيقى سينمائية'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => genre = v ?? genre)),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(value: mood, decoration: const InputDecoration(labelText: 'الإحساس والحالة العاطفية', border: OutlineInputBorder()), items: const ['حزين','شجن','عتاب','ألم','صحوة بعد الوجع','رومانسي','فرح','حماس','أمل'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => mood = v ?? mood)),
+        DropdownButtonFormField<String>(initialValue: mood, decoration: const InputDecoration(labelText: 'الإحساس والحالة العاطفية', border: OutlineInputBorder()), items: const ['حزين','شجن','عتاب','ألم','صحوة بعد الوجع','رومانسي','فرح','حماس','أمل'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (v) => setState(() => mood = v ?? mood)),
 
         SwitchListTile(value: instrumental, onChanged: (v) => setState(() => instrumental = v), title: const Text('موسيقى فقط بدون غناء')),
       ],

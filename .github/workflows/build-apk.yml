@@ -131,6 +131,9 @@ jobs:
           print("Patched file_picker compileSdk to 36:", picker_gradle)
           PY
 
+      - name: Run Flutter widget tests
+        run: flutter test
+
       - name: Build APK
         run: flutter build apk --release
 

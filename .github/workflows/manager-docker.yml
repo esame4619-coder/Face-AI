@@ -46,7 +46,9 @@ jobs:
           if [ "$healthy" != true ]; then docker logs face-ai-manager; exit 1; fi
           python - <<'PY'
           import wave
-          with wave.open("$RUNNER_TEMP/input.wav", "wb") as audio:
+          from pathlib import Path
+          import os
+          with wave.open(str(Path(os.environ["RUNNER_TEMP"]) / "input.wav"), "wb") as audio:
               audio.setnchannels(1)
               audio.setsampwidth(2)
               audio.setframerate(48000)
@@ -61,7 +63,7 @@ jobs:
             -o "$RUNNER_TEMP/changed.mp3"
           python - <<'PY'
           from pathlib import Path
-          data = Path("$RUNNER_TEMP/changed.mp3").read_bytes()
+          data = (Path(os.environ["RUNNER_TEMP"]) / "changed.mp3").read_bytes()
           assert data.startswith(b"ID3") or data[:1] == b"\xff", "Output is not a valid MP3 stream"
           print("Verified MP3 output bytes:", len(data))
           PY

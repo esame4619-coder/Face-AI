@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -1114,9 +1115,24 @@ class _MyWorksPageState extends State<MyWorksPage> {
               Flexible(
                 child: file.path.endsWith('.mp4')
                     ? _SavedVideoPreview(file: file)
-                    : InteractiveViewer(child: Image.file(file, fit: BoxFit.contain)),
+                    : file.path.endsWith('.mp3')
+                        ? Column(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.audio_file, size: 64),
+                            const SizedBox(height: 8),
+                            Text(file.uri.pathSegments.last, textAlign: TextAlign.center),
+                            const Text('ملف صوت MP3 محفوظ وجاهز للمشاركة أو الحفظ في مكان آخر.'),
+                          ])
+                        : InteractiveViewer(child: Image.file(file, fit: BoxFit.contain)),
               ),
               const SizedBox(height: 8),
+              if (file.path.endsWith('.mp3') || file.path.endsWith('.mp4'))
+                FilledButton.icon(
+                  onPressed: () async {
+                    await Share.shareXFiles([XFile(file.path)], text: titleFor(file));
+                  },
+                  icon: const Icon(Icons.share),
+                  label: const Text('مشاركة / حفظ الملف'),
+                ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('إغلاق'),

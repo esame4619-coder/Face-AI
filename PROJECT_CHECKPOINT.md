@@ -116,3 +116,17 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 - Public release workflow run `45740163450`: SUCCESS. Final APK #112 is published at https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45739348131/app-release.apk
 - Final APK SHA-256: `2a2e1dd072be466cf7b41c07362fe9a564576f3c23dc70aff0876f6b190451f8` (53,385,271 bytes).
 - Flutter analyzer initially identified deprecated dropdown parameters; these were migrated to `initialValue`. The remaining Flutter Material umbrella-import deprecation is currently suppressed at that import until Flutter's suggested replacement package is part of the stable SDK. Final analyzer gate passed.
+
+
+## Work batch — 2026-11-26 (after APK 112 user device confirmation)
+- User installed APK 112 and confirmed the app opens and screens work on their Android phone.
+- Added `POST /api/change-voice`: validates audio via ffprobe, enforces 30 MB / 10 minute limits, and generates an MP3 with FFmpeg pitch/equalization effects for male/female/child presets.
+- Connected Flutter's "تغيير الأصوات" screen to the new endpoint; it uploads the selected audio, handles API errors, saves the returned MP3 in app documents, and lists it in My Works.
+- Important accuracy: this is offline pitch/effect processing, not AI voice identity cloning. Voice cloning and AI song generation remain unimplemented.
+- Added success, invalid-input, empty-file and API-key tests for the audio endpoint. Backend API Tests #86 run `45741189209`: **61 passed, 1 upstream Starlette/httpx deprecation warning**.
+- Added optional Colab GPU setup: the temporary-server notebook detects a Colab GPU, installs FaceFusion `cuda@12`, verifies `CUDAExecutionProvider`, and configures FaceFusion to use CUDA with CPU fallback. CPU mode remains supported when no GPU is allocated.
+- Updated FaceFusion engine command construction to pass explicit execution providers only when configured.
+- FaceFusion Docker Build Check #20 run `45741149004`: SUCCESS, including Docker image build, CLI checks, and an actual CPU FaceFusion face-swap inference that produced a valid image.
+- Manager Docker Build Check #61 run `45741189266`: SUCCESS.
+- Android Build #113 run `45741007604` (commit `2078da5b33feb9d1eaba505d7e77caa3b82d9736`) passed Flutter static analysis and widget smoke tests; APK compilation was still running at checkpoint update. Do not claim APK 113 published until build and release workflow succeed.
+- Colab GPU availability is not guaranteed; the notebook uses one temporary session and does not create a persistent multi-worker pool.

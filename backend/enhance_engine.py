@@ -19,7 +19,7 @@ def _load_model():
     if _MODEL is not None:
         return _MODEL
     model_path = Path(os.getenv("AI_ENHANCE_MODEL_PATH", "/opt/models/EDSR_x2.pb"))
-    if not model_path.is_file():
+    if not model_path.is_file() or model_path.stat().st_size < 1_000_000:
         return None
     try:
         import cv2
@@ -47,7 +47,12 @@ def enhance(data: bytes) -> bytes:
     cv2, model = loaded
     import numpy as np
     with Image.open(BytesIO(data)) as opened:
-        rgb = np.asarray(opened.convert("RGB"))
+        image = opened.convert("RGB")
+        width, height = image.size
+        scale = min(1.0, (4_000_000 / max(1, width * height)) ** 0.5, 2048 / max(width, height))
+        if scale < 1.0:
+            image = image.resize((max(1, int(width * scale)), max(1, int(height * scale))), Image.Resampling.LANCZOS)
+        rgb = np.asarray(image)
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     enhanced = model.upsample(bgr)
     enhanced = cv2.cvtColor(enhanced, cv2.COLOR_BGR2RGB)

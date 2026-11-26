@@ -79,8 +79,8 @@ pytest backend/tests -q
 - Backend API Tests: 65 اختبارًا ناجحًا، تشمل مسار EDSR والفشل الآمن إلى Pillow.
 - Manager Docker image: تم بناؤها بنجاح في GitHub Actions.
 - Flutter widget smoke test: ناجح.
-- Android APK build #116: ناجح ومنشور. Flutter static analysis واختبار الواجهة ناجحان.
-- [تنزيل أحدث APK](https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45742663569/app-release.apk)
+- Android APK build #120: ناجح ومنشور (versionCode 4). Flutter static analysis واختبار الواجهة ناجحان.
+- [تنزيل أحدث APK](https://github.com/esame4619-coder/Face-AI/releases/download/apk-build-45756203178/app-release.apk)
 
 تم التحقق من استدلال FaceFusion حقيقي على CPU داخل CI، كما تم اختبار API تغيير الصوت داخل صورة المدير. هذا لا يعني أن خادم Colab الدائم أو GPU متاح؛ Colab جلسة مؤقتة فقط، ويظل اختبار فيديوهات المستخدم الفعلية ضرورياً.
 

@@ -13,6 +13,7 @@ from fastapi.responses import Response
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 from engine import face_swap_engine
+from enhance_engine import is_available as ai_enhance_available, enhance as ai_enhance
 from worker_pool import dispatch_faceswap, dispatch_video_faceswap, dispatch_video_face_detection, pool_status
 
 
@@ -59,6 +60,7 @@ async def health():
         "engine": "FaceFusion",
         "engine_available": face_swap_engine.is_available(),
         "worker_pool_configured": bool(os.getenv("WORKERS_JSON", "").strip()),
+        "ai_enhance_available": ai_enhance_available(),
     }
 
 
@@ -95,38 +97,46 @@ async def validate_image(file: UploadFile):
 
 @app.post("/api/enhance")
 async def enhance_image(image: UploadFile = File(...), _auth: None = Depends(verify_api_key)):
-    """Basic local enhancement: orientation correction, gentle contrast/color,
-    sharpening and 2x Lanczos enlargement. This is not an AI super-resolution model.
-    """
+    """Use EDSR x2 super-resolution when installed; otherwise safe Pillow enhancement."""
     data = await validate_image(image)
+    if ai_enhance_available():
+        try:
+            result = await asyncio.to_thread(ai_enhance, data)
+            return Response(
+                content=result,
+                media_type="image/png",
+                headers={
+                    "Content-Disposition": "attachment; filename=enhanced-ai.png",
+                    "X-Enhancement-Engine": "EDSR-x2",
+                },
+            )
+        except Exception:
+            logger.exception("EDSR AI enhancement failed; falling back to Pillow")
     try:
         with Image.open(BytesIO(data)) as opened:
             processed = ImageOps.exif_transpose(opened).convert("RGB")
-
         width, height = processed.size
-        if width < 1 or height < 1 or width * height > 25_000_000:
+        if width < 1 or height < 1 or width * height > MAX_IMAGE_PIXELS:
             raise HTTPException(413, "Image dimensions are too large")
-
         processed = ImageEnhance.Contrast(processed).enhance(1.08)
         processed = ImageEnhance.Color(processed).enhance(1.06)
         processed = ImageEnhance.Sharpness(processed).enhance(1.25)
-        processed = processed.filter(
-            ImageFilter.UnsharpMask(radius=1.4, percent=115, threshold=3)
-        )
-
+        processed = processed.filter(ImageFilter.UnsharpMask(radius=1.4, percent=115, threshold=3))
         scale = min(2.0, 4096 / max(width, height))
         if scale > 1:
             processed = processed.resize(
                 (max(1, int(width * scale)), max(1, int(height * scale))),
                 Image.Resampling.LANCZOS,
             )
-
         output = BytesIO()
         processed.save(output, format="PNG", optimize=True)
         return Response(
             content=output.getvalue(),
             media_type="image/png",
-            headers={"Content-Disposition": "attachment; filename=enhanced.png"},
+            headers={
+                "Content-Disposition": "attachment; filename=enhanced.png",
+                "X-Enhancement-Engine": "Pillow-fallback",
+            },
         )
     except HTTPException:
         raise

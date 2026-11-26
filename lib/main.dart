@@ -794,12 +794,13 @@ class _ImageStudioState extends State<ImageStudio> {
       final streamed = await request.send().timeout(const Duration(minutes: 2));
       final response = await http.Response.fromStream(streamed);
       if (response.statusCode != 200) throw Exception('الخادم رد برمز ${response.statusCode}.');
+      final engine = response.headers['x-enhancement-engine'] ?? 'unknown';
       final directory = await getApplicationDocumentsDirectory();
       final output = File('${directory.path}/enhanced_${DateTime.now().millisecondsSinceEpoch}.png');
       await output.writeAsBytes(response.bodyBytes, flush: true);
       if (!mounted) return;
       setState(() => enhancedImage = output);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحسين الصورة وحفظ النتيجة داخل التطبيق.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(engine == 'EDSR-x2' ? 'تم التحسين بالذكاء الاصطناعي EDSR x2 وحفظ الصورة.' : 'تم التحسين الأساسي وحفظ الصورة. خادم AI Super Resolution غير محمّل حالياً.')));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحسين الصورة: $error')));

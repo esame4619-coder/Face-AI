@@ -155,3 +155,11 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 - Added two API tests. Backend API Tests #94 run `45754958762`: 63 passed. Manager Docker Build Check #73 run `45754958742`: success, including actual FFmpeg conversion and MP3 validation. Manager #72 also succeeded.
 - APK Build #117 run `45754977733` was in progress at checkpoint write; confirm completion and publish latest release before declaring updated APK ready.
 - Remaining audio model constraints: AI voice cloning and sung-lyrics music generation are still not activated. Do not claim these as functional. No persistent free GPU workers are provisioned.
+
+
+## Voice EQ preset batch — 2026-11-26
+- Voice changer now accepts an optional validated `accent` EQ preset (neutral, Egyptian, Gulf, Modern Standard Arabic, US English, UK English). FFmpeg applies pitch + EQ filters; it does not translate or truly change a spoken accent.
+- Flutter sends the selected EQ preset and the UI labels it accurately as tonal EQ processing.
+- Backend API Tests #97 run `45755513414`: 65 passed, 1 upstream Starlette/httpx deprecation warning.
+- Android APK Build #118 run `45755507427` was in progress; it includes the voice EQ UI/API parameter. Wait for successful build and publish workflow before replacing the public APK link.
+- Colab notebook now makes a real authenticated EDSR x2 image enhancement request before it opens the public tunnel and fails early if EDSR inference is not actually available.

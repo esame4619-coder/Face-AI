@@ -92,3 +92,14 @@ Continue directly from this checkpoint. Do not ask the user to repeat project re
 
 - Backend API Tests #80 (run `45548349510`) SUCCESS: 49 passed, 1 upstream Starlette/httpx deprecation warning. The new API-level MOV upload test passes.
 - Manager Docker Build Check #55 (run `45548349368`) was still in progress at this checkpoint.
+
+
+## Quality and regression pass (2026-11-26)
+- Expanded API regression coverage for all four processing endpoints when an API key is configured, valid-key access to image enhancement, worker-pool health reporting, controlled video-swap unavailability when FaceFusion is absent, and EXIF orientation correction.
+- Added operational exception logging for failed video face-swap jobs; client responses remain generic and do not expose server internals.
+- Backend API Tests run `45738038145` SUCCESS: **57 passed, 1 upstream Starlette/httpx deprecation warning**.
+- Manager Docker Build Check run `45738038128` SUCCESS.
+- Added Flutter widget smoke test at `test/app_smoke_test.dart` and made the Android APK workflow run `flutter test` before building.
+- Flutter smoke test passed in Android Build run `45738195335` (run #109). APK build was still running at the time this checkpoint entry was written; do not claim a new APK exists until the run and public release workflow both succeed.
+- Relevant commits: API tests `098e421576115a3f261d49fb94e94745b768a998`; video error logging `81bef3ba6e052867d655798942d34dc251507114`; Flutter smoke test `0bff1afb5ff314a4d9741ca6781aa7bf82d6e819`; APK workflow test gate `3e8a4e13df1f37ec07c67598dc196969d3bf5225`.
+- The six-tool UI is not equivalent to six live AI engines. Photo/video face swap still requires a real, reachable FaceFusion worker and a live inference test. Voice cloning, voice changing and song generation remain UI-only. Image enhancement is basic Pillow/Lanczos processing, not AI super-resolution. No free GPU workers are configured or verified.

@@ -2,7 +2,7 @@ name: face_ai
 description: تطبيق المحترف في AI - أدوات الذكاء الاصطناعي للصور والفيديو والصوت.
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

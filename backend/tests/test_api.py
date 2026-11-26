@@ -474,3 +474,29 @@ def test_change_voice_returns_mp3_when_ffmpeg_succeeds(monkeypatch):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("audio/mpeg")
     assert response.content == b"mock-mp3-output"
+
+
+def test_enhance_uses_edsr_when_available(monkeypatch):
+    monkeypatch.setattr(main, "ai_enhance_available", lambda: True)
+    monkeypatch.setattr(main, "ai_enhance", lambda _data: make_png())
+    response = client.post(
+        "/api/enhance",
+        files={"image": ("input.png", make_png(), "image/png")},
+    )
+    assert response.status_code == 200
+    assert response.headers["x-enhancement-engine"] == "EDSR-x2"
+    assert Image.open(BytesIO(response.content)).size == (32, 24)
+
+
+def test_enhance_falls_back_when_edsr_fails(monkeypatch):
+    monkeypatch.setattr(main, "ai_enhance_available", lambda: True)
+    def fail(_data):
+        raise RuntimeError("model unavailable")
+    monkeypatch.setattr(main, "ai_enhance", fail)
+    response = client.post(
+        "/api/enhance",
+        files={"image": ("input.png", make_png(), "image/png")},
+    )
+    assert response.status_code == 200
+    assert response.headers["x-enhancement-engine"] == "Pillow-fallback"
+    assert Image.open(BytesIO(response.content)).size == (64, 48)

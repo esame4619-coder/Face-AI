@@ -339,3 +339,88 @@ def test_video_face_detection_accepts_quicktime_mov(monkeypatch):
     )
     assert response.status_code == 200
     assert response.json()["faces"][0]["score"] == 0.9
+
+
+@pytest.mark.parametrize(
+    "path,files,data",
+    [
+        ("/api/enhance", {"image": ("input.png", make_png(), "image/png")}, None),
+        (
+            "/api/faceswap",
+            {
+                "source": ("source.png", make_png(), "image/png"),
+                "target": ("target.png", make_png(), "image/png"),
+            },
+            None,
+        ),
+        (
+            "/api/video-faces",
+            {"target_video": ("clip.mp4", b"video", "video/mp4")},
+            None,
+        ),
+        (
+            "/api/faceswap-video",
+            {
+                "source": ("face.png", make_png(), "image/png"),
+                "target_video": ("clip.mp4", b"video", "video/mp4"),
+            },
+            {"reference_frame_number": "0", "reference_face_position": "0"},
+        ),
+    ],
+)
+def test_processing_endpoints_require_configured_api_key(monkeypatch, path, files, data):
+    monkeypatch.setenv("API_KEY", "endpoint-test-secret")
+    response = client.post(path, files=files, data=data)
+    assert response.status_code == 401
+    assert "مفتاح الوصول" in response.json()["detail"]
+
+
+def test_processing_endpoint_accepts_configured_api_key_for_enhancement(monkeypatch):
+    monkeypatch.setenv("API_KEY", "endpoint-test-secret")
+    response = client.post(
+        "/api/enhance",
+        files={"image": ("input.png", make_png(), "image/png")},
+        headers={"Authorization": "Bearer endpoint-test-secret"},
+    )
+    assert response.status_code == 200
+
+
+def test_health_reports_worker_pool_configuration(monkeypatch):
+    monkeypatch.setenv("WORKERS_JSON", '[{"name":"worker-a","url":"https://worker.example"}]')
+    monkeypatch.setattr(main.face_swap_engine, "is_available", lambda: True)
+    response = client.get("/health")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["worker_pool_configured"] is True
+    assert payload["engine_available"] is True
+
+
+def test_video_swap_returns_controlled_unavailable_without_engine(monkeypatch):
+    monkeypatch.delenv("WORKERS_JSON", raising=False)
+    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.setattr(main, "inspect_video", lambda _data: 2.0)
+    monkeypatch.setattr(main.face_swap_engine, "is_available", lambda: False)
+    response = client.post(
+        "/api/faceswap-video",
+        files={
+            "source": ("face.png", make_png(), "image/png"),
+            "target_video": ("clip.mp4", b"valid-video", "video/mp4"),
+        },
+    )
+    assert response.status_code == 503
+    assert "FaceFusion" in response.json()["detail"]
+
+
+def test_enhance_corrects_exif_orientation_before_processing():
+    buffer = BytesIO()
+    image = Image.new("RGB", (20, 10), (20, 40, 60))
+    exif = Image.Exif()
+    exif[274] = 6
+    image.save(buffer, format="JPEG", exif=exif)
+    response = client.post(
+        "/api/enhance",
+        files={"image": ("rotated.jpg", buffer.getvalue(), "image/jpeg")},
+    )
+    assert response.status_code == 200
+    result = Image.open(BytesIO(response.content))
+    assert result.size == (20, 40)

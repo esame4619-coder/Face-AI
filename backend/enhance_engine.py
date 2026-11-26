@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 from threading import Lock
 
-import numpy as np
 from PIL import Image
 from io import BytesIO
 
@@ -46,6 +45,7 @@ def enhance(data: bytes) -> bytes:
     if loaded is None:
         raise RuntimeError("EDSR x2 model is not installed")
     cv2, model = loaded
+    import numpy as np
     with Image.open(BytesIO(data)) as opened:
         rgb = np.asarray(opened.convert("RGB"))
     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)

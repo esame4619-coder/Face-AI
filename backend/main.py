@@ -297,3 +297,77 @@ async def face_swap_video(
     except Exception:
         logger.exception("Video face swap processing failed")
         raise HTTPException(503, "تعذرت معالجة الفيديو حاليًا. تأكد من جاهزية محرك FaceFusion والسيرفر.")
+
+
+MAX_AUDIO_SIZE = 30 * 1024 * 1024
+MAX_AUDIO_DURATION = 600.0
+
+
+def inspect_audio(data: bytes) -> float:
+    """Validate a decodable audio file and enforce a ten-minute duration."""
+    with tempfile.NamedTemporaryFile(suffix=".audio") as temp:
+        temp.write(data)
+        temp.flush()
+        try:
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "a:0",
+                 "-show_entries", "stream=codec_type:format=duration",
+                 "-of", "default=noprint_wrappers=1", temp.name],
+                capture_output=True, text=True, timeout=20, check=True,
+            )
+            values = dict(line.split("=", 1) for line in probe.stdout.splitlines() if "=" in line)
+            duration = float(values.get("duration", "0"))
+            if values.get("codec_type") != "audio" or not 0 < duration <= MAX_AUDIO_DURATION:
+                raise ValueError("invalid audio stream or duration")
+            return duration
+        except (subprocess.SubprocessError, ValueError, OSError):
+            raise HTTPException(400, "ملف صوتي غير صالح أو مدته أكبر من 10 دقائق.") from None
+
+
+@app.post("/api/change-voice")
+async def change_voice(
+    audio: UploadFile = File(...),
+    voice_type: str = Form(...),
+    _auth: None = Depends(verify_api_key),
+):
+    """Apply an offline pitch/formant-style voice effect with FFmpeg (not AI cloning)."""
+    if voice_type not in {"رجل", "امرأة", "طفل"}:
+        raise HTTPException(400, "نوع الصوت غير مدعوم.")
+    data = await audio.read(MAX_AUDIO_SIZE + 1)
+    if not data:
+        raise HTTPException(400, "ملف الصوت فارغ.")
+    if len(data) > MAX_AUDIO_SIZE:
+        raise HTTPException(413, "الحد الأقصى لحجم الصوت 30 ميجابايت.")
+    inspect_audio(data)
+    # A moderate resampling shift preserves duration via atempo. This is a
+    # lightweight offline effect; it does not synthesize a new speaker identity.
+    pitch = {"رجل": 0.88, "امرأة": 1.12, "طفل": 1.24}[voice_type]
+    with tempfile.TemporaryDirectory(prefix="mohtarif-voice-") as temp_dir:
+        input_path = Path(temp_dir) / "input.audio"
+        output_path = Path(temp_dir) / "changed-voice.mp3"
+        input_path.write_bytes(data)
+        sample_rate = 48000
+        filter_chain = (
+            f"asetrate={int(sample_rate * pitch)},aresample={sample_rate},"
+            f"atempo={1.0 / pitch:.6f},highpass=f=80,lowpass=f=12000"
+        )
+        try:
+            completed = await asyncio.to_thread(
+                subprocess.run,
+                ["ffmpeg", "-y", "-v", "error", "-i", str(input_path),
+                 "-vn", "-af", filter_chain, "-codec:a", "libmp3lame",
+                 "-b:a", "192k", str(output_path)],
+                capture_output=True, text=True, timeout=300, check=False,
+            )
+            if completed.returncode != 0 or not output_path.is_file() or output_path.stat().st_size == 0:
+                logger.error("FFmpeg voice effect failed: %s", (completed.stderr or "")[-2000:])
+                raise RuntimeError("FFmpeg voice effect failed")
+            return Response(
+                content=output_path.read_bytes(), media_type="audio/mpeg",
+                headers={"Content-Disposition": 'attachment; filename="changed-voice.mp3"'},
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Voice effect processing failed")
+            raise HTTPException(503, "تعذر تحويل الصوت. تأكد من جاهزية خادم FFmpeg.") from None
